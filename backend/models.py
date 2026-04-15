@@ -2,6 +2,14 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
 import datetime
+from sqlalchemy import Enum
+import enum
+
+class OrderStatus(enum.Enum):
+    IN_QUEUE = "IN_QUEUE"
+    IN_PROGRESS = "IN_PROGRESS"
+    QUALITY_CHECK = "QUALITY_CHECK"
+    COMPLETED = "COMPLETED"
 
 
 class Order(Base):
@@ -17,7 +25,7 @@ class Order(Base):
     date_deadline = Column(DateTime)
 
     # Status
-    status = Column(String, default="In queue")
+    status = Column(Enum(OrderStatus), default=OrderStatus.IN_QUEUE)
 
     # Relationship: One order can have multiple parts
     parts = relationship("OrderPart", back_populates="owner", cascade="all, delete-orphan")

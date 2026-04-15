@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>WeldERP</title>
+    <style>
+        body { font-family: Arial; background: #f5f7fa; padding: 40px; }
+        h2 { color: #333; }
+        .card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 400px; }
+        input { width: 100%; padding: 10px; margin: 5px 0 10px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
+        button { padding: 8px; margin: 2px; border: none; border-radius: 5px; background: #4CAF50; color: white; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .danger { background: #e74c3c; }
+        .danger:hover { background: #c0392b; }
+        ul { padding: 0; }
+        li { list-style: none; padding: 10px; background: #fff; margin-bottom: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .status { font-size: 12px; margin-top: 5px; font-weight: bold; color: #0056b3; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Dodaj zlecenie</h2>
+    <input id="order_number" placeholder="Numer zlecenia (np. ZL/001)">
+    <input id="client_name" placeholder="Nazwa klienta">
+    <button onclick="addOrder()">Dodaj Zlecenie</button>
+</div>
+
+<div class="card">
+    <h2>Lista zleceń</h2>
+    <button onclick="loadOrders()">Odśwież Listę</button>
+    <ul id="orders"></ul>
+</div>
+
+<script>
+async function addOrder() {
+    const order_number = document.getElementById("order_number").value;
+    const client_name = document.getElementById("client_name").value;
+
+    if (!order_number || !client_name) {
+        alert("Wypełnij wszystkie pola!");
+        return;
+    }
+
+    try {
+        const res = await fetch("/orders/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                order_number: order_number,
+                client_name: client_name,
+                parts: []
+            })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            alert(data.message);
+            document.getElementById("order_number").value = "";
+            document.getElementById("client_name").value = "";
+            loadOrders();
+        } else {
+            alert("Błąd: " + data.detail);
+        }
+    } catch (e) {
+        alert("Błąd połączenia z serwerem.");
+    }
+}
+
+async function loadOrders() {
+    const res = await fetch("/orders/");
+    const data = await res.json();
+    const list = document.getElementById("orders");
+    list.innerHTML = "";
+
+    data.forEach(o => {
+        const li = document.createElement("li");
+        li.innerHTML = `
+            <b>${o.order_number}</b><br>
+            Klient: ${o.client_name}<br>
+            <div class="status">Status: ${o.status}</div>
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;">
+            <button onclick="updateStatus(${o.id}, 'IN_QUEUE')">Kolejka</button>
+            <button onclick="updateStatus(${o.id}, 'IN_PROGRESS')">W toku</button>
+            <button onclick="updateStatus(${o.id}, 'COMPLETED')">Gotowe</button>
+            <button class="danger" onclick="deleteOrder(${o.id})">Usuń</button>
+        `;
+        list.appendChild(li);
+    });
+}
+
+async function updateStatus(id, status) {
+    await fetch(`/orders/${id}/status?status=${status}`, { method: "PUT" });
+    loadOrders();
+}
+
+async function deleteOrder(id) {
+    await fetch(`/orders/${id}`, { method: "DELETE" });
+    loadOrders();
+}
+
+// Załaduj zlecenia od razu po otwarciu strony
+loadOrders();
+</script>
+
+</body>
+</html>

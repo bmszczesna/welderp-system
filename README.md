@@ -12,7 +12,8 @@ The project was created to support order registration, production flow control, 
 - FastAPI
 - PostgreSQL
 - SQLAlchemy
-- Docker & Docker Compose
+- Docker
+- Docker Compose
 - HTML
 - CSS
 - JavaScript
@@ -39,7 +40,7 @@ The web interface allows users to:
 - view all orders
 - update order status
 - delete orders
-- refresh order list
+- refresh the order list
 
 ---
 
@@ -63,19 +64,21 @@ Each order contains:
 
 ---
 
-# Aplication URLs
+# Application URLs
 
-Frontend
+## Frontend
 
 http://localhost:8000
 
-API Documentation (Swagger UI)
+## API Documentation (Swagger UI)
 
 http://localhost:8000/docs
 
+---
 
-# Project Structure 
+# Project Structure
 
+```text id="kg2l03"
 welderp-system/
 │
 ├── backend/
@@ -92,4 +95,3 @@ welderp-system/
 │
 ├── docker-compose.yml
 └── README.md
-

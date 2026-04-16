@@ -94,8 +94,15 @@ def get_orders(db: Session = Depends(database.get_db)):
             "id": o.id,
             "order_number": o.order_number,
             "client_name": o.client_name,
-            "status": o.status.value if o.status else None,  # 🔥 WAŻNE
-            "parts": []
+            "date_deadline": o.date_deadline,
+            "status": o.status.value if o.status else None,
+            "parts": [
+                {
+                    "id": p.id,
+                    "part_name": p.part_name
+                }
+                for p in o.parts
+            ]
         })
 
     return result

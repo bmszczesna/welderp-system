@@ -23,6 +23,8 @@
     <h2>Dodaj zlecenie</h2>
     <input id="order_number" placeholder="Numer zlecenia (np. ZL/001)">
     <input id="client_name" placeholder="Nazwa klienta">
+    <input id="deadline" type="date" placeholder="Termin realizacji">
+<input id="parts" placeholder="Części po przecinku, np. Rama, Drzwi">
     <button onclick="addOrder()">Dodaj Zlecenie</button>
 </div>
 
@@ -36,34 +38,40 @@
 async function addOrder() {
     const order_number = document.getElementById("order_number").value;
     const client_name = document.getElementById("client_name").value;
+    const deadline = document.getElementById("deadline").value;
+    const partsInput = document.getElementById("parts").value;
 
     if (!order_number || !client_name) {
-        alert("Wypełnij wszystkie pola!");
+        alert("Wypełnij numer i klienta!");
         return;
     }
 
-    try {
-        const res = await fetch("/orders/", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                order_number: order_number,
-                client_name: client_name,
-                parts: []
-            })
-        });
+    const parts = partsInput
+        .split(",")
+        .map(p => p.trim())
+        .filter(p => p !== "")
+        .map(p => ({ part_name: p }));
 
-        const data = await res.json();
-        if (res.ok) {
-            alert(data.message);
-            document.getElementById("order_number").value = "";
-            document.getElementById("client_name").value = "";
-            loadOrders();
-        } else {
-            alert("Błąd: " + data.detail);
-        }
-    } catch (e) {
-        alert("Błąd połączenia z serwerem.");
+    const payload = {
+        order_number: order_number,
+        client_name: client_name,
+        date_deadline: deadline ? deadline + "T00:00:00" : null,
+        parts: parts
+    };
+
+    const res = await fetch("/orders/", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+        alert("Dodano zlecenie");
+        loadOrders();
+    } else {
+        alert(data.detail || "Błąd");
     }
 }
 
@@ -75,16 +83,22 @@ async function loadOrders() {
 
     data.forEach(o => {
         const li = document.createElement("li");
-        li.innerHTML = `
-            <b>${o.order_number}</b><br>
-            Klient: ${o.client_name}<br>
-            <div class="status">Status: ${o.status}</div>
-            <hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;">
-            <button onclick="updateStatus(${o.id}, 'IN_QUEUE')">Kolejka</button>
-            <button onclick="updateStatus(${o.id}, 'IN_PROGRESS')">W toku</button>
-            <button onclick="updateStatus(${o.id}, 'COMPLETED')">Gotowe</button>
-            <button class="danger" onclick="deleteOrder(${o.id})">Usuń</button>
-        `;
+       li.innerHTML = `
+        <b>${o.order_number}</b><br>
+        Klient: ${o.client_name}<br>
+        Termin: ${o.date_deadline ? o.date_deadline.slice(0,10) : "-"}<br>
+        <div class="status">Status: ${o.status}</div>
+        Części: ${
+            o.parts && o.parts.length
+            ? o.parts.map(p => p.part_name).join(", ")
+            : "-"
+        }
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;">
+        <button onclick="updateStatus(${o.id}, 'IN_QUEUE')">Kolejka</button>
+        <button onclick="updateStatus(${o.id}, 'IN_PROGRESS')">W toku</button>
+        <button onclick="updateStatus(${o.id}, 'COMPLETED')">Gotowe</button>
+        <button class="danger" onclick="deleteOrder(${o.id})">Usuń</button>
+    `   ;
         list.appendChild(li);
     });
 }
@@ -99,7 +113,7 @@ async function deleteOrder(id) {
     loadOrders();
 }
 
-// Załaduj zlecenia od razu po otwarciu strony
+
 loadOrders();
 </script>
 

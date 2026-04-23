@@ -7,12 +7,14 @@ from backend import models
 from backend import database
 from backend.models import OrderStatus
 from fastapi.responses import FileResponse
-import os
+from fastapi.staticfiles import StaticFiles
 
 
 models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI(title="WeldERP - Order Management API")
+
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -53,9 +55,20 @@ class OrderResponse(BaseModel):
         from_attributes = True
 
 # --- API Endpoints ---
-@app.get("/")
-def serve_frontend():
+
+@app.get("/index.html")
+def serve_index_html():
     return FileResponse("frontend/index.html")
+
+
+@app.get("/")
+def serve_kanban():
+    return FileResponse("frontend/kanban.html")
+
+
+@app.get("/kanban.html")
+def serve_kanban_html():
+    return FileResponse("frontend/kanban.html")
 
 
 @app.post("/orders/", status_code=201)

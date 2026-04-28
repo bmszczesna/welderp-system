@@ -18,7 +18,12 @@
 			</div>
 		</header>
 
-		<p id="message" class="message" hidden></p>
+		<div class="search-message-row">
+			<p id="message" class="message" hidden></p>
+			<div class="search-wrap">
+				<input id="searchInput" class="search" type="search" placeholder="Szukaj zlecenia...">
+			</div>
+		</div>
 
 		<section class="board" aria-label="Kanban board">
 			<article class="column queue">
@@ -65,14 +70,20 @@
 		};
 
 		let orders = [];
+		let searchQuery = "";
+		let messageTimer = null;
 
 		function showMessage(text, type = "info") {
 			const el = document.getElementById("message");
+			if (messageTimer) {
+				clearTimeout(messageTimer);
+			}
 			el.textContent = text;
 			el.className = `message ${type}`;
 			el.hidden = false;
-			setTimeout(() => {
+			messageTimer = setTimeout(() => {
 				el.hidden = true;
+				messageTimer = null;
 			}, 2200);
 		}
 
@@ -102,11 +113,30 @@
 			return card;
 		}
 
+		function matchesSearch(order) {
+			if (!searchQuery) {
+				return true;
+			}
+
+			const searchableText = [
+				order.order_number,
+				order.client_name,
+				order.project_name || ""
+			]
+				.join(" ")
+				.toLowerCase();
+
+			return searchableText.includes(searchQuery);
+		}
+
 		function renderBoard() {
+			const visibleOrders = orders.filter(matchesSearch);
+			const hasSearch = Boolean(searchQuery);
+
 			STATUSES.forEach((status) => {
 				const container = document.getElementById(COLUMN_IDS[status]);
 				const count = document.getElementById(`count-${status}`);
-				const items = orders.filter((o) => o.status === status);
+				const items = visibleOrders.filter((o) => o.status === status);
 
 				container.innerHTML = "";
 				count.textContent = String(items.length);
@@ -114,7 +144,7 @@
 				if (!items.length) {
 					const empty = document.createElement("p");
 					empty.className = "empty-state";
-					empty.textContent = "Brak zleceń";
+					empty.textContent = hasSearch ? "Brak wyników" : "Brak zleceń";
 					container.appendChild(empty);
 					return;
 				}
@@ -193,6 +223,11 @@
 
 		document.getElementById("newOrderBtn").addEventListener("click", () => {
 			window.location.href = "/index.html";
+		});
+
+		document.getElementById("searchInput").addEventListener("input", (event) => {
+			searchQuery = event.target.value.trim().toLowerCase();
+			renderBoard();
 		});
 
 		setupDropZones();

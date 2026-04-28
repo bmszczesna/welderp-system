@@ -44,13 +44,50 @@ body {
     gap: 8px;
 }
 
-.message {
+.search-message-row {
+    display: flex;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 12px;
     margin: 0 0 14px;
+}
+
+.search-wrap {
+    flex: 0 0 25%;
+    min-width: 220px;
+}
+
+.search {
+    width: 100%;
+    border: 1px solid var(--border);
+    background: #ffffff;
+    color: var(--text);
+    border-radius: 10px;
     padding: 10px 12px;
+    font-size: 14px;
+}
+
+.search::placeholder {
+    color: #9ca3af;
+}
+
+.message {
+    flex: 1 1 75%;
+    margin: 0;
+    padding: 10px 14px;
     border-radius: 10px;
     font-size: 14px;
     border: 1px solid transparent;
-    background: #ffffff;
+    background: transparent;
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    color: var(--muted);
+}
+
+.message[hidden] {
+    display: flex !important;
+    visibility: hidden;
 }
 
 .message.success {
@@ -91,9 +128,10 @@ body {
     background: #eef1f6;
     border: 1px solid var(--border);
     border-radius: 14px;
-    min-height: 520px;
+    height: 560px;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .column-head {
@@ -133,8 +171,25 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    min-height: 120px;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
     transition: background 0.15s ease, outline-color 0.15s ease;
+}
+
+.cards::-webkit-scrollbar {
+    width: 10px;
+}
+
+.cards::-webkit-scrollbar-thumb {
+    background: #c7ced9;
+    border-radius: 999px;
+    border: 2px solid #eef1f6;
+}
+
+.cards::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .cards.drop-active {
@@ -204,8 +259,22 @@ body {
 }
 
 @media (max-width: 680px) {
+    .search-message-row {
+        flex-direction: column;
+    }
+
+    .search-wrap,
+    .message {
+        width: 100%;
+        flex: 1 1 auto;
+    }
+
     .board {
         grid-template-columns: 1fr;
+    }
+
+    .column {
+        height: 480px;
     }
 
     .topbar {

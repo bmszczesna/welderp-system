@@ -1,237 +1,222 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>WeldERP</title>
-	<link rel="stylesheet" href="/frontend/css/kanban.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeldERP - Tablica Kanban</title>
+    <link rel="stylesheet" href="/frontend/css/kanban.css">
 </head>
 <body>
-	<main class="page">
-		<header class="topbar">
-			<div>
-				<h1 class="title">WeldERP</h1>
-			</div>
-			<div class="actions">
-				<button class="btn" type="button" id="refreshBtn">Odśwież</button>
-				<button class="btn btn-primary" type="button" id="newOrderBtn">Nowe zlecenie</button>
-			</div>
-		</header>
+    <main class="page">
+        <header class="topbar">
+            <div>
+                <h1 class="title">🛠️ WeldERP - Produkcja</h1>
+            </div>
+            <div class="actions">
+                <button class="btn" style="background: white; border: 1px solid var(--border); color: black;" onclick="loadOrders()">🔄 Odśwież</button>
+                <a href="/index.html" class="btn btn-primary" style="text-decoration: none; display: inline-block;">➕ Zarządzaj Zleceniami</a>
+            </div>
+        </header>
 
-		<div class="search-message-row">
-			<p id="message" class="message" hidden></p>
-			<div class="search-wrap">
-				<input id="searchInput" class="search" type="search" placeholder="Szukaj zlecenia...">
-			</div>
-		</div>
+        <section class="board" aria-label="Kanban board">
+            <article class="column">
+                <div class="column-head">
+                    <h2 class="column-title"><span class="dot" style="background: var(--queue); width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px;"></span>Oczekujące</h2>
+                    <span class="count" id="count-IN_QUEUE" style="font-size: 12px; color: var(--muted); background: #fff; border-radius: 999px; padding: 4px 10px; font-weight: bold; border: 1px solid var(--border);">0</span>
+                </div>
+                <div class="cards" data-status="IN_QUEUE"></div>
+            </article>
 
-		<section class="board" aria-label="Kanban board">
-			<article class="column queue">
-				<div class="column-head">
-					<h2 class="column-title"><span class="dot" style="background: var(--queue);"></span>Oczekujące</h2>
-					<span class="count" id="count-IN_QUEUE">0</span>
-				</div>
-				<div class="cards" id="col-in-queue" data-status="IN_QUEUE"></div>
-			</article>
+            <article class="column">
+                <div class="column-head">
+                    <h2 class="column-title"><span class="dot" style="background: var(--progress); width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px;"></span>W toku</h2>
+                    <span class="count" id="count-IN_PROGRESS" style="font-size: 12px; color: var(--muted); background: #fff; border-radius: 999px; padding: 4px 10px; font-weight: bold; border: 1px solid var(--border);">0</span>
+                </div>
+                <div class="cards" data-status="IN_PROGRESS"></div>
+            </article>
 
-			<article class="column progress">
-				<div class="column-head">
-					<h2 class="column-title"><span class="dot" style="background: var(--progress);"></span>Realizacja</h2>
-					<span class="count" id="count-IN_PROGRESS">0</span>
-				</div>
-				<div class="cards" id="col-in-progress" data-status="IN_PROGRESS"></div>
-			</article>
+            <article class="column">
+                <div class="column-head">
+                    <h2 class="column-title"><span class="dot" style="background: var(--quality); width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px;"></span>Kontrola jakości</h2>
+                    <span class="count" id="count-QUALITY_CHECK" style="font-size: 12px; color: var(--muted); background: #fff; border-radius: 999px; padding: 4px 10px; font-weight: bold; border: 1px solid var(--border);">0</span>
+                </div>
+                <div class="cards" data-status="QUALITY_CHECK"></div>
+            </article>
 
-			<article class="column quality">
-				<div class="column-head">
-					<h2 class="column-title"><span class="dot" style="background: var(--quality);"></span>Kontrola jakości</h2>
-					<span class="count" id="count-QUALITY_CHECK">0</span>
-				</div>
-				<div class="cards" id="col-quality-check" data-status="QUALITY_CHECK"></div>
-			</article>
+            <article class="column">
+                <div class="column-head">
+                    <h2 class="column-title"><span class="dot" style="background: var(--done); width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px;"></span>Zakończone</h2>
+                    <span class="count" id="count-COMPLETED" style="font-size: 12px; color: var(--muted); background: #fff; border-radius: 999px; padding: 4px 10px; font-weight: bold; border: 1px solid var(--border);">0</span>
+                </div>
+                <div class="cards" data-status="COMPLETED"></div>
+            </article>
+        </section>
+    </main>
 
-			<article class="column done">
-				<div class="column-head">
-					<h2 class="column-title"><span class="dot" style="background: var(--done);"></span>Zakończone</h2>
-					<span class="count" id="count-COMPLETED">0</span>
-				</div>
-				<div class="cards" id="col-completed" data-status="COMPLETED"></div>
-			</article>
-		</section>
-	</main>
+    <script>
+        const STATUSES = ["IN_QUEUE", "IN_PROGRESS", "QUALITY_CHECK", "COMPLETED"];
+        let orders = [];
 
-	<script>
-		const STATUSES = ["IN_QUEUE", "IN_PROGRESS", "QUALITY_CHECK", "COMPLETED"];
-		const COLUMN_IDS = {
-			IN_QUEUE: "col-in-queue",
-			IN_PROGRESS: "col-in-progress",
-			QUALITY_CHECK: "col-quality-check",
-			COMPLETED: "col-completed"
-		};
+        async function loadOrders() {
+            try {
+                const res = await fetch("/orders/");
+                if (res.ok) {
+                    orders = await res.json();
+                    renderBoard();
+                }
+            } catch (err) {
+                console.error("Błąd pobierania danych:", err);
+            }
+        }
 
-		let orders = [];
-		let searchQuery = "";
-		let messageTimer = null;
+        function renderBoard() {
+            STATUSES.forEach(status => {
+                document.querySelector(`.cards[data-status="${status}"]`).innerHTML = "";
+                document.getElementById(`count-${status}`).textContent = "0";
+            });
 
-		function showMessage(text, type = "info") {
-			const el = document.getElementById("message");
-			if (messageTimer) {
-				clearTimeout(messageTimer);
-			}
-			el.textContent = text;
-			el.className = `message ${type}`;
-			el.hidden = false;
-			messageTimer = setTimeout(() => {
-				el.hidden = true;
-				messageTimer = null;
-			}, 2200);
-		}
+            const counts = { IN_QUEUE: 0, IN_PROGRESS: 0, QUALITY_CHECK: 0, COMPLETED: 0 };
 
-		function createCard(order) {
-			const card = document.createElement("div");
-			card.className = "order-card";
-			card.draggable = true;
-			card.dataset.orderId = String(order.id);
-			card.dataset.status = order.status;
+            orders.forEach(order => {
+                if (!order.parts || order.parts.length === 0) return;
 
-			card.innerHTML = `
-				<p class="order-number">${order.order_number}</p>
-				<p class="client">Klient: ${order.client_name}</p>
-				${order.project_name ? `<p class="project">Projekt: ${order.project_name}</p>` : ""}
-			`;
+                order.parts.forEach(part => {
+                    const status = part.status || order.status; 
+                    
+                    if (counts[status] !== undefined) {
+                        counts[status]++;
+                        const card = createPartCard(order, part, status);
+                        document.querySelector(`.cards[data-status="${status}"]`).appendChild(card);
+                    }
+                });
+            });
 
-			card.addEventListener("dragstart", (event) => {
-				event.dataTransfer.setData("text/plain", String(order.id));
-				event.dataTransfer.effectAllowed = "move";
-				card.classList.add("dragging");
-			});
+            STATUSES.forEach(status => {
+                document.getElementById(`count-${status}`).textContent = counts[status];
+                const column = document.querySelector(`.cards[data-status="${status}"]`);
+                if (counts[status] === 0) {
+                    column.innerHTML = `<p class="empty-state" style="text-align: center; color: var(--muted); font-size: 13px; margin-top: 20px; font-style: italic;">Brak części</p>`;
+                }
+            });
+        }
 
-			card.addEventListener("dragend", () => {
-				card.classList.remove("dragging");
-			});
+        function createPartCard(order, part, status) {
+            const card = document.createElement("div");
+            card.className = "order-card";
+            card.draggable = true;
+            
+            card.dataset.partId = part.id;
 
-			return card;
-		}
+            if(status === 'IN_PROGRESS') card.style.borderLeftColor = 'var(--progress)';
+            if(status === 'QUALITY_CHECK') card.style.borderLeftColor = 'var(--quality)';
+            if(status === 'COMPLETED') card.style.borderLeftColor = 'var(--done)';
 
-		function matchesSearch(order) {
-			if (!searchQuery) {
-				return true;
-			}
+            const deadlineStr = order.date_deadline ? order.date_deadline.slice(0,10) : 'Brak';
 
-			const searchableText = [
-				order.order_number,
-				order.client_name,
-				order.project_name || ""
-			]
-				.join(" ")
-				.toLowerCase();
+			let issueHtml = "";
+    		if (part.issue) {
+        		issueHtml = `<div style="background: #fee2e2; color: #b91c1c; padding: 6px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-bottom: 10px; border: 1px solid #fca5a5;">🚨 PROBLEM: ${part.issue}</div>`;
+        		card.style.borderLeftColor = '#ef4444'; 
+    		}
 
-			return searchableText.includes(searchQuery);
-		}
+            card.innerHTML = `
+                <span class="card-order-num" style="font-size: 11px; font-weight: 800; color: var(--muted); margin-bottom: 6px; display: block;">ZLECENIE: ${order.order_number}</span>
+                <div class="card-part-name" style="font-size: 16px; font-weight: 700; margin-bottom: 8px; color: var(--primary);">⚙️ ${part.part_name}</div>
+                <div class="card-client" style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">👤 ${order.client_name}</div>
+                ${issueHtml}
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 15px;">
+                    <span style="font-size: 11px; color: #9ca3af; font-weight: bold;">📅 ${deadlineStr}</span>
+                    <button class="btn-issue" style="padding: 4px 8px; font-size: 11px; background: #fee2e2; color: #b91c1c; border-radius: 6px; border: none; cursor: pointer; font-weight: bold;" onclick="reportIssue(${part.id})">⚠ Brak mat.</button>
+                </div>
+            `;
 
-		function renderBoard() {
-			const visibleOrders = orders.filter(matchesSearch);
-			const hasSearch = Boolean(searchQuery);
+            card.addEventListener("dragstart", (e) => {
+                e.dataTransfer.setData("text/plain", part.id);
+                card.classList.add("dragging");
+            });
+            
+            card.addEventListener("dragend", () => {
+                card.classList.remove("dragging");
+            });
 
-			STATUSES.forEach((status) => {
-				const container = document.getElementById(COLUMN_IDS[status]);
-				const count = document.getElementById(`count-${status}`);
-				const items = visibleOrders.filter((o) => o.status === status);
+            return card;
+        }
 
-				container.innerHTML = "";
-				count.textContent = String(items.length);
+        async function movePart(partId, targetStatus) {
+            try {
+                const res = await fetch(`/parts/${partId}/status?status=${targetStatus}`, {
+                    method: "PUT"
+                });
+                
+                if (res.ok) {
+                    loadOrders(); 
+                } else {
+                    alert("Aby to zadziałało, musisz dodać funkcję przesuwania części w backendzie!");
+                    loadOrders(); 
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Błąd połączenia z serwerem.");
+            }
+        }
 
-				if (!items.length) {
-					const empty = document.createElement("p");
-					empty.className = "empty-state";
-					empty.textContent = hasSearch ? "Brak wyników" : "Brak zleceń";
-					container.appendChild(empty);
-					return;
-				}
+		async function reportIssue(partId) {
+    		const issueText = prompt("Zgłoś problem (np. Brak materiału, Awaria maszyny).\nZostaw puste okienko i kliknij OK, aby usunąć stary problem:");
 
-				items.forEach((order) => {
-					container.appendChild(createCard(order));
-				});
-			});
-		}
+    		// Jeśli użytkownik nie kliknął "Anuluj"
+    		if (issueText !== null) { 
+        		try {
+            		const res = await fetch(`/parts/${partId}/issue?issue_text=${encodeURIComponent(issueText)}`, {
+                	method: "PUT"
+            });
+            
+            	if (res.ok) {
+                	loadOrders(); 
+            	} else {
+                	alert("Błąd podczas zgłaszania problemu!");
+            	}
+        	} catch (err) {
+            	console.error(err);
+            	alert("Błąd połączenia z serwerem.");
+        	}
+    	}
+	}
 
-		async function loadOrders() {
-			const res = await fetch("/orders/");
-			if (!res.ok) {
-				showMessage("Błąd pobierania zleceń", "error");
-				return;
-			}
+        function setupDropZones() {
+            document.querySelectorAll(".cards").forEach(zone => {
+                zone.addEventListener("dragover", (e) => {
+                    e.preventDefault();
+                    zone.classList.add("drop-active");
+                    zone.style.background = "#dfe2e9";
+                    zone.style.outline = "2px dashed #9ca3af";
+                    zone.style.outlineOffset = "-4px";
+                    zone.style.borderRadius = "0 0 12px 12px";
+                });
 
-			orders = await res.json();
-			renderBoard();
-		}
+                zone.addEventListener("dragleave", () => {
+                    zone.classList.remove("drop-active");
+                    zone.style.background = "";
+                    zone.style.outline = "";
+                });
 
-		async function moveOrder(orderId, targetStatus) {
-			const current = orders.find((o) => o.id === orderId);
-			if (!current || current.status === targetStatus) {
-				return;
-			}
+                zone.addEventListener("drop", (e) => {
+                    e.preventDefault();
+                    zone.classList.remove("drop-active");
+                    zone.style.background = "";
+                    zone.style.outline = "";
 
-			const previousStatus = current.status;
-			current.status = targetStatus;
-			renderBoard();
+                    const partId = e.dataTransfer.getData("text/plain");
+                    const targetStatus = zone.dataset.status;
+                    
+                    if (partId && targetStatus) {
+                        movePart(partId, targetStatus);
+                    }
+                });
+            });
+        }
 
-			const res = await fetch(`/orders/${orderId}/status?status=${targetStatus}`, {
-				method: "PUT"
-			});
-
-			if (!res.ok) {
-				current.status = previousStatus;
-				renderBoard();
-				showMessage("Nie udało się zmienić statusu", "error");
-				return;
-			}
-
-			showMessage("Status zaktualizowany", "success");
-		}
-
-		function setupDropZones() {
-			document.querySelectorAll(".cards").forEach((zone) => {
-				zone.addEventListener("dragover", (event) => {
-					event.preventDefault();
-					event.dataTransfer.dropEffect = "move";
-					zone.classList.add("drop-active");
-				});
-
-				zone.addEventListener("dragleave", () => {
-					zone.classList.remove("drop-active");
-				});
-
-				zone.addEventListener("drop", async (event) => {
-					event.preventDefault();
-					zone.classList.remove("drop-active");
-
-					const droppedId = Number(event.dataTransfer.getData("text/plain"));
-					const targetStatus = zone.dataset.status;
-					if (!droppedId || !targetStatus) {
-						return;
-					}
-
-					await moveOrder(droppedId, targetStatus);
-				});
-			});
-		}
-
-		document.getElementById("refreshBtn").addEventListener("click", () => {
-			loadOrders();
-		});
-
-		document.getElementById("newOrderBtn").addEventListener("click", () => {
-			window.location.href = "/index.html";
-		});
-
-		document.getElementById("searchInput").addEventListener("input", (event) => {
-			searchQuery = event.target.value.trim().toLowerCase();
-			renderBoard();
-		});
-
-		setupDropZones();
-		loadOrders();
-	</script>
+        setupDropZones();
+        window.onload = loadOrders;
+    </script>
 </body>
 </html>

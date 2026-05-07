@@ -37,5 +37,7 @@ class OrderPart(Base):
     id = Column(Integer, primary_key=True, index=True)
     part_name = Column(String, nullable=False)
     order_id = Column(Integer, ForeignKey("orders.id"))
+    status = Column(Enum(OrderStatus), default=OrderStatus.IN_QUEUE) #dodane 
+    issue = Column(String, nullable=True) #dodane do zgłaszania problemów z częścią
 
     owner = relationship("Order", back_populates="parts")

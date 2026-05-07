@@ -39,6 +39,8 @@ class OrderCreate(BaseModel):
 class PartResponse(BaseModel):
     id: int
     part_name: str
+    status: Optional[str] = None  # Dodane
+    issue: Optional[str] = None # Dodane
 
     class Config:
         from_attributes = True
@@ -112,7 +114,9 @@ def get_orders(db: Session = Depends(database.get_db)):
             "parts": [
                 {
                     "id": p.id,
-                    "part_name": p.part_name
+                    "part_name": p.part_name,
+                    "status": p.status.value if p.status else "IN_QUEUE", 
+                    "issue": p.issue
                 }
                 for p in o.parts
             ]
@@ -159,3 +163,37 @@ def delete_order(order_id: int, db: Session = Depends(database.get_db)):
     db.commit()
 
     return {"message": "Order deleted"}
+
+@app.put("/parts/{part_id}/status")
+def update_part_status(part_id: int, status: str, db: Session = Depends(database.get_db)):
+
+    part = db.query(models.OrderPart).filter(models.OrderPart.id == part_id).first()
+
+    if not part:
+        raise HTTPException(status_code=404, detail="Part not found")
+
+    try:
+        part.status = OrderStatus(status)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid status")
+
+    db.commit()
+    db.refresh(part)
+
+    return {"message": "Part status updated", "status": part.status.value}
+
+
+@app.put("/parts/{part_id}/issue")
+def update_part_issue(part_id: int, issue_text: str, db: Session = Depends(database.get_db)):
+    part = db.query(models.OrderPart).filter(models.OrderPart.id == part_id).first()
+    
+    if not part:
+        raise HTTPException(status_code=404, detail="Nie znaleziono części")
+    
+    if issue_text.lower() == "null" or issue_text == "":
+        part.issue = None
+    else:
+        part.issue = issue_text
+        
+    db.commit()
+    return {"message": "Problem zgłoszony"}

@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>WeldERP</title>
+	<link rel="stylesheet" href="/frontend/css/kanban.css">
+</head>
+<body>
+	<main class="page">
+		<header class="topbar">
+			<div>
+				<h1 class="title">WeldERP</h1>
+			</div>
+			<div class="actions">
+				<button class="btn" type="button" id="refreshBtn">Odśwież</button>
+				<button class="btn btn-primary" type="button" id="newOrderBtn">Nowe zlecenie</button>
+			</div>
+		</header>
+
+		<div class="search-message-row">
+			<p id="message" class="message" hidden></p>
+			<div class="search-wrap">
+				<input id="searchInput" class="search" type="search" placeholder="Szukaj zlecenia...">
+			</div>
+		</div>
+
+		<section class="board" aria-label="Kanban board">
+			<article class="column queue">
+				<div class="column-head">
+					<h2 class="column-title"><span class="dot" style="background: var(--queue);"></span>Oczekujące</h2>
+					<span class="count" id="count-IN_QUEUE">0</span>
+				</div>
+				<div class="cards" id="col-in-queue" data-status="IN_QUEUE"></div>
+			</article>
+
+			<article class="column progress">
+				<div class="column-head">
+					<h2 class="column-title"><span class="dot" style="background: var(--progress);"></span>Realizacja</h2>
+					<span class="count" id="count-IN_PROGRESS">0</span>
+				</div>
+				<div class="cards" id="col-in-progress" data-status="IN_PROGRESS"></div>
+			</article>
+
+			<article class="column quality">
+				<div class="column-head">
+					<h2 class="column-title"><span class="dot" style="background: var(--quality);"></span>Kontrola jakości</h2>
+					<span class="count" id="count-QUALITY_CHECK">0</span>
+				</div>
+				<div class="cards" id="col-quality-check" data-status="QUALITY_CHECK"></div>
+			</article>
+
+			<article class="column done">
+				<div class="column-head">
+					<h2 class="column-title"><span class="dot" style="background: var(--done);"></span>Zakończone</h2>
+					<span class="count" id="count-COMPLETED">0</span>
+				</div>
+				<div class="cards" id="col-completed" data-status="COMPLETED"></div>
+			</article>
+		</section>
+	</main>
+
+	<script>
+		const STATUSES = ["IN_QUEUE", "IN_PROGRESS", "QUALITY_CHECK", "COMPLETED"];
+		const COLUMN_IDS = {
+			IN_QUEUE: "col-in-queue",
+			IN_PROGRESS: "col-in-progress",
+			QUALITY_CHECK: "col-quality-check",
+			COMPLETED: "col-completed"
+		};
+
+		let orders = [];
+		let searchQuery = "";
+		let messageTimer = null;
+
+		function showMessage(text, type = "info") {
+			const el = document.getElementById("message");
+			if (messageTimer) {
+				clearTimeout(messageTimer);
+			}
+			el.textContent = text;
+			el.className = `message ${type}`;
+			el.hidden = false;
+			messageTimer = setTimeout(() => {
+				el.hidden = true;
+				messageTimer = null;
+			}, 2200);
+		}
+
+		function createCard(order) {
+			const card = document.createElement("div");
+			card.className = "order-card";
+			card.draggable = true;
+			card.dataset.orderId = String(order.id);
+			card.dataset.status = order.status;
+
+			card.innerHTML = `
+				<p class="order-number">${order.order_number}</p>
+				<p class="client">Klient: ${order.client_name}</p>
+				${order.project_name ? `<p class="project">Projekt: ${order.project_name}</p>` : ""}
+			`;
+
+			card.addEventListener("dragstart", (event) => {
+				event.dataTransfer.setData("text/plain", String(order.id));
+				event.dataTransfer.effectAllowed = "move";
+				card.classList.add("dragging");
+			});
+
+			card.addEventListener("dragend", () => {
+				card.classList.remove("dragging");
+			});
+
+			return card;
+		}
+
+		function matchesSearch(order) {
+			if (!searchQuery) {
+				return true;
+			}
+
+			const searchableText = [
+				order.order_number,
+				order.client_name,
+				order.project_name || ""
+			]
+				.join(" ")
+				.toLowerCase();
+
+			return searchableText.includes(searchQuery);
+		}
+
+		function renderBoard() {
+			const visibleOrders = orders.filter(matchesSearch);
+			const hasSearch = Boolean(searchQuery);
+
+			STATUSES.forEach((status) => {
+				const container = document.getElementById(COLUMN_IDS[status]);
+				const count = document.getElementById(`count-${status}`);
+				const items = visibleOrders.filter((o) => o.status === status);
+
+				container.innerHTML = "";
+				count.textContent = String(items.length);
+
+				if (!items.length) {
+					const empty = document.createElement("p");
+					empty.className = "empty-state";
+					empty.textContent = hasSearch ? "Brak wyników" : "Brak zleceń";
+					container.appendChild(empty);
+					return;
+				}
+
+				items.forEach((order) => {
+					container.appendChild(createCard(order));
+				});
+			});
+		}
+
+		async function loadOrders() {
+			const res = await fetch("/orders/");
+			if (!res.ok) {
+				showMessage("Błąd pobierania zleceń", "error");
+				return;
+			}
+
+			orders = await res.json();
+			renderBoard();
+		}
+
+		async function moveOrder(orderId, targetStatus) {
+			const current = orders.find((o) => o.id === orderId);
+			if (!current || current.status === targetStatus) {
+				return;
+			}
+
+			const previousStatus = current.status;
+			current.status = targetStatus;
+			renderBoard();
+
+			const res = await fetch(`/orders/${orderId}/status?status=${targetStatus}`, {
+				method: "PUT"
+			});
+
+			if (!res.ok) {
+				current.status = previousStatus;
+				renderBoard();
+				showMessage("Nie udało się zmienić statusu", "error");
+				return;
+			}
+
+			showMessage("Status zaktualizowany", "success");
+		}
+
+		function setupDropZones() {
+			document.querySelectorAll(".cards").forEach((zone) => {
+				zone.addEventListener("dragover", (event) => {
+					event.preventDefault();
+					event.dataTransfer.dropEffect = "move";
+					zone.classList.add("drop-active");
+				});
+
+				zone.addEventListener("dragleave", () => {
+					zone.classList.remove("drop-active");
+				});
+
+				zone.addEventListener("drop", async (event) => {
+					event.preventDefault();
+					zone.classList.remove("drop-active");
+
+					const droppedId = Number(event.dataTransfer.getData("text/plain"));
+					const targetStatus = zone.dataset.status;
+					if (!droppedId || !targetStatus) {
+						return;
+					}
+
+					await moveOrder(droppedId, targetStatus);
+				});
+			});
+		}
+
+		document.getElementById("refreshBtn").addEventListener("click", () => {
+			loadOrders();
+		});
+
+		document.getElementById("newOrderBtn").addEventListener("click", () => {
+			window.location.href = "/index.html";
+		});
+
+		document.getElementById("searchInput").addEventListener("input", (event) => {
+			searchQuery = event.target.value.trim().toLowerCase();
+			renderBoard();
+		});
+
+		setupDropZones();
+		loadOrders();
+	</script>
+</body>
+</html>

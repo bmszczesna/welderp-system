@@ -60,8 +60,35 @@
 		</section>
 	</main>
 
+	<div id="orderModal" class="modal-overlay">
+		<div class="modal-box">
+			<span class="modal-close" onclick="closeModal()">&times;</span>
+			
+			<div class="modal-header">
+				<h2 id="modalOrderNumber">Zlecenie: 000</h2>
+			</div>
+			
+			<div class="info-grid">
+				<div class="info-box"><span>Klient</span><strong id="modalClient">-</strong></div>
+				<div class="info-box"><span>Operator</span><strong id="modalOperator">-</strong></div>
+				<div class="info-box"><span>Data otrzymania</span><strong id="modalDateReceived">-</strong></div>
+				<div class="info-box"><span>Termin</span><strong id="modalDeadline" style="color: #ef4444;">-</strong></div>
+				<div class="info-box"><span>Status</span><strong id="modalStatus">-</strong></div>
+			</div>
+
+			<h3 class="modal-parts-title">Części:</h3>
+			<div id="modalPartsList" class="modal-parts-container"></div>
+		</div>
+	</div>
+
 	<script>
 		const STATUSES = ["IN_QUEUE", "IN_PROGRESS", "QUALITY_CHECK", "COMPLETED"];
+		const STATUS_NAMES = {
+			"IN_QUEUE": "Oczekujące",
+			"IN_PROGRESS": "W realizacji",
+			"QUALITY_CHECK": "Kontrola jakości",
+			"COMPLETED": "Zakończone"
+		};
 		const COLUMN_IDS = {
 			IN_QUEUE: "col-in-queue",
 			IN_PROGRESS: "col-in-progress",
@@ -87,6 +114,61 @@
 			}, 2200);
 		}
 
+		function openModal(orderId) {
+			const order = orders.find(o => o.id === orderId);
+			if (!order) return;
+
+			const STATUS_COLORS = {
+				"IN_QUEUE": "var(--queue)",
+				"IN_PROGRESS": "var(--progress)",
+				"QUALITY_CHECK": "var(--quality)",
+				"COMPLETED": "var(--done)"
+			};
+
+			document.getElementById('modalOrderNumber').textContent = "Zlecenie: " + order.order_number;
+			document.getElementById('modalClient').textContent = order.client_name;
+			document.getElementById('modalOperator').textContent = order.operator || "Nie przypisano";
+			document.getElementById('modalDateReceived').textContent = order.date_received ? order.date_received.slice(0, 10) : "2026-05-18"; 
+			document.getElementById('modalDeadline').textContent = order.date_deadline ? order.date_deadline.slice(0, 10) : "Brak";
+			
+			const statusEl = document.getElementById('modalStatus');
+			statusEl.textContent = STATUS_NAMES[order.status] || order.status;
+			statusEl.style.color = STATUS_COLORS[order.status] || "#111827";
+
+			let partsHtml = "";
+			if (order.parts && order.parts.length > 0) {
+				partsHtml = `<ol class="modal-parts-list">`;
+				order.parts.forEach(part => {
+					partsHtml += `<li><span class="part-name-text">${part.part_name}</span>`;
+					if (part.steps && part.steps.length > 0) {
+						partsHtml += `<ul class="modal-steps-list">`;
+						part.steps.forEach(step => {
+							partsHtml += `<li>${step.step_name}</li>`;
+						});
+						partsHtml += `</ul>`;
+					}
+					partsHtml += `</li>`;
+				});
+				partsHtml += `</ol>`;
+			} else {
+				partsHtml = "<p style='color: #6b7280; font-style: italic;'>Brak szczegółowych części w tym zleceniu.</p>";
+			}
+			document.getElementById('modalPartsList').innerHTML = partsHtml;
+
+			document.getElementById('orderModal').style.display = "block";
+		}
+
+		function closeModal() {
+			document.getElementById('orderModal').style.display = "none";
+		}
+
+		window.onclick = function(event) {
+			const modal = document.getElementById('orderModal');
+			if (event.target == modal) {
+				modal.style.display = "none";
+			}
+		}
+
 		function createCard(order) {
 			const card = document.createElement("div");
 			card.className = "order-card";
@@ -94,10 +176,14 @@
 			card.dataset.orderId = String(order.id);
 			card.dataset.status = order.status;
 
+            const deadlineStr = order.date_deadline ? order.date_deadline.slice(0, 10) : "Brak terminu";
+
 			card.innerHTML = `
-				<p class="order-number">${order.order_number}</p>
-				<p class="client">Klient: ${order.client_name}</p>
-				${order.project_name ? `<p class="project">Projekt: ${order.project_name}</p>` : ""}
+				<div class="card-header">
+					<p class="order-number"><strong>${order.order_number}</strong></p>
+					<button class="info-btn" onclick="openModal(${order.id})" title="Szczegóły zlecenia">ℹ️</button>
+				</div>
+                <p class="order-deadline">${deadlineStr}</p>
 			`;
 
 			card.addEventListener("dragstart", (event) => {

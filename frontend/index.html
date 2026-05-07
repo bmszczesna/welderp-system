@@ -1,121 +1,157 @@
 <!DOCTYPE html>
-<html>
+<html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <title>WeldERP</title>
+    <title>WeldERP - Zarządzanie Zleceniami</title>
     <style>
-        body { font-family: Arial; background: #f5f7fa; padding: 40px; }
-        h2 { color: #333; }
-        .card { background: white; padding: 20px; margin-bottom: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); width: 400px; }
-        input { width: 100%; padding: 10px; margin: 5px 0 10px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box; }
-        button { padding: 8px; margin: 2px; border: none; border-radius: 5px; background: #4CAF50; color: white; cursor: pointer; }
-        button:hover { background: #45a049; }
-        .danger { background: #e74c3c; }
-        .danger:hover { background: #c0392b; }
-        ul { padding: 0; }
-        li { list-style: none; padding: 10px; background: #fff; margin-bottom: 10px; border-radius: 5px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .status { font-size: 12px; margin-top: 5px; font-weight: bold; color: #0056b3; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f3f5f9; padding: 20px; color: #1f2937; margin: 0; }
+        .header-container { text-align: center; margin-bottom: 20px; }
+        .header-container h1 { margin-bottom: 5px; }
+        .header-container a { text-decoration: none; color: #3b82f6; font-weight: bold; font-size: 16px; }
+
+        .dashboard-wrapper { max-width: 1100px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); display: grid; grid-template-columns: 1fr 1.5fr; border: 1px solid #e5e7eb; }
+        .left-panel { background: #ffffff; padding: 30px; border-right: 1px solid #e5e7eb; }
+        .right-panel { background: #f9fafb; padding: 30px; }
+
+        input, select { width: 100%; padding: 10px; margin: 5px 0 15px; border-radius: 8px; border: 1px solid #d1d5db; box-sizing: border-box; font-family: inherit;}
+        label { font-size: 13px; font-weight: bold; color: #4b5563; }
+        
+        button { padding: 10px 15px; border: none; border-radius: 8px; background: #111827; color: white; cursor: pointer; font-weight: bold; transition: 0.2s;}
+        button:hover { background: #374151; }
+        .btn-success { background: #22c55e; width: 100%; font-size: 16px; margin-top: 20px; padding: 15px;}
+        .btn-success:hover { background: #16a34a; }
+        
+        .part-block { background: #ffffff; border: 1px solid #e5e7eb; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02);}
+        .step-input-group { display: flex; gap: 10px; margin-bottom: 8px; }
+        .step-input-group input { margin: 0; }
+        .btn-small { padding: 6px 12px; font-size: 12px; background: #3b82f6; }
+        .btn-remove { background: #ef4444; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>Dodaj zlecenie</h2>
-    <input id="order_number" placeholder="Numer zlecenia (np. ZL/001)">
-    <input id="client_name" placeholder="Nazwa klienta">
-    <input id="deadline" type="date" placeholder="Termin realizacji">
-<input id="parts" placeholder="Części po przecinku, np. Rama, Drzwi">
-    <button onclick="addOrder()">Dodaj Zlecenie</button>
+<div class="header-container">
+    <h1>WeldERP</h1>
+    <a href="/kanban.html">Przejdź do Tablicy Kanban</a>
 </div>
 
-<div class="card">
-    <h2>Lista zleceń</h2>
-    <button onclick="loadOrders()">Odśwież Listę</button>
-    <ul id="orders"></ul>
+<div class="dashboard-wrapper">
+    <div class="left-panel">
+        <h2 style="margin-top: 0;">Dane Zlecenia</h2>
+        <label>Numer Zlecenia</label>
+        <input id="order_number" placeholder="np. ZL/001">
+        
+        <label>Klient</label>
+        <input id="client_name" placeholder="Nazwa klienta">
+
+        <label>Data otrzymania zlecenia</label>
+        <input id="date_received" type="date">
+        
+        <label>Termin Realizacji</label>
+        <input id="deadline" type="date">
+
+        <label>Przypisz Operatora</label>
+        <select id="operator">
+            <option value="Brak">Nie wybrano</option>
+            <option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
+            <option value="Tomasz Nowak">Tomasz Nowak</option>
+            <option value="Anna Wiśniewska">Anna Wiśniewska</option>
+        </select>
+
+        <button class="btn-success" onclick="submitOrder()">Utwórz Zlecenie</button>
+    </div>
+
+    <div class="right-panel">
+        <h2 style="margin-top: 0;">Części</h2>
+        <div id="partsContainer"></div>
+        <button type="button" onclick="addPartBlock()" style="background: #3b82f6; width: 100%;">+ Dodaj nową część</button>
+    </div>
 </div>
 
 <script>
-async function addOrder() {
-    const order_number = document.getElementById("order_number").value;
-    const client_name = document.getElementById("client_name").value;
-    const deadline = document.getElementById("deadline").value;
-    const partsInput = document.getElementById("parts").value;
-
-    if (!order_number || !client_name) {
-        alert("Wypełnij numer i klienta!");
-        return;
+    function addPartBlock() {
+        const container = document.getElementById("partsContainer");
+        const partDiv = document.createElement("div");
+        partDiv.className = "part-block";
+        partDiv.innerHTML = `
+            <input type="text" class="part-name" placeholder="Nazwa części (np. Rama Główna)" style="font-weight: bold;">
+            <div class="stepsContainer"></div>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button type="button" class="btn-small" onclick="addStepBlock(this)">+ Dodaj krok (np. Spawanie)</button>
+                <button type="button" class="btn-small btn-remove" onclick="this.parentElement.parentElement.remove()">Usuń część</button>
+            </div>
+        `;
+        container.appendChild(partDiv);
     }
 
-    const parts = partsInput
-        .split(",")
-        .map(p => p.trim())
-        .filter(p => p !== "")
-        .map(p => ({ part_name: p }));
-
-    const payload = {
-        order_number: order_number,
-        client_name: client_name,
-        date_deadline: deadline ? deadline + "T00:00:00" : null,
-        parts: parts
-    };
-
-    const res = await fetch("/orders/", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify(payload)
-    });
-
-    const data = await res.json();
-
-    if (res.ok) {
-        alert("Dodano zlecenie");
-        loadOrders();
-    } else {
-        alert(data.detail || "Błąd");
+    function addStepBlock(btnElement) {
+        const stepsContainer = btnElement.parentElement.previousElementSibling;
+        const stepDiv = document.createElement("div");
+        stepDiv.className = "step-input-group";
+        stepDiv.innerHTML = `
+            <input type="text" class="step-name" placeholder="Opis kroku (np. Cięcie plazmą)">
+            <button type="button" class="btn-small btn-remove" onclick="this.parentElement.remove()">X</button>
+        `;
+        stepsContainer.appendChild(stepDiv);
     }
-}
 
-async function loadOrders() {
-    const res = await fetch("/orders/");
-    const data = await res.json();
-    const list = document.getElementById("orders");
-    list.innerHTML = "";
+    async function submitOrder() {
+        const orderNum = document.getElementById("order_number").value.trim();
+        const clientName = document.getElementById("client_name").value.trim();
+        const dateReceived = document.getElementById("date_received").value;
+        const deadline = document.getElementById("deadline").value;
+        const operatorValue = document.getElementById("operator").value;
 
-    data.forEach(o => {
-        const li = document.createElement("li");
-       li.innerHTML = `
-        <b>${o.order_number}</b><br>
-        Klient: ${o.client_name}<br>
-        Termin: ${o.date_deadline ? o.date_deadline.slice(0,10) : "-"}<br>
-        <div class="status">Status: ${o.status}</div>
-        Części: ${
-            o.parts && o.parts.length
-            ? o.parts.map(p => p.part_name).join(", ")
-            : "-"
+        if (!orderNum || !clientName || !deadline) {
+            alert("Błąd: Wypełnij Numer zlecenia, Klienta oraz Deadline!");
+            return; 
         }
-        <hr style="border: 0; border-top: 1px solid #eee; margin: 10px 0;">
-        <button onclick="updateStatus(${o.id}, 'IN_QUEUE')">Kolejka</button>
-        <button onclick="updateStatus(${o.id}, 'IN_PROGRESS')">W toku</button>
-        <button onclick="updateStatus(${o.id}, 'COMPLETED')">Gotowe</button>
-        <button class="danger" onclick="deleteOrder(${o.id})">Usuń</button>
-    `   ;
-        list.appendChild(li);
-    });
-}
 
-async function updateStatus(id, status) {
-    await fetch(`/orders/${id}/status?status=${status}`, { method: "PUT" });
-    loadOrders();
-}
+        const payload = {
+            order_number: orderNum,
+            client_name: clientName,
+            date_received: dateReceived + "T00:00:00",
+            date_deadline: deadline + "T00:00:00",
+            operator: operatorValue === "Brak" ? null : operatorValue,
+            parts: []
+        };
 
-async function deleteOrder(id) {
-    await fetch(`/orders/${id}`, { method: "DELETE" });
-    loadOrders();
-}
+        let hasError = false;
+        let partCount = 0;
 
+        document.querySelectorAll(".part-block").forEach(partBlock => {
+            const partName = partBlock.querySelector(".part-name").value.trim();
+            if (!partName) { hasError = true; return; }
+            partCount++;
 
-loadOrders();
+            const steps = [];
+            partBlock.querySelectorAll(".step-name").forEach(stepInput => {
+                if(stepInput.value.trim()) steps.push({ step_name: stepInput.value.trim() });
+            });
+            payload.parts.push({ part_name: partName, steps: steps });
+        });
+
+        if (partCount === 0 || hasError) {
+            alert("Błąd: Zlecenie musi mieć poprawne części (nazwy nie mogą być puste)!");
+            return;
+        }
+
+        const res = await fetch("/orders/", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+            alert("Zlecenie utworzone!");
+            window.location.reload();
+        } else {
+            const data = await res.json();
+            alert("Błąd: " + (data.detail || "Sprawdź dane"));
+        }
+    }
+    
+    window.onload = () => addPartBlock();
 </script>
-
 </body>
 </html>

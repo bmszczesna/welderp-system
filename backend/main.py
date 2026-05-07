@@ -26,20 +26,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class StepCreate(BaseModel):
+    step_name: str
+
 class PartCreate(BaseModel):
     part_name: str
+    steps: List[StepCreate] = []
 
 
 class OrderCreate(BaseModel):
     order_number: str
     client_name: str
+    date_received: Optional[datetime] = None
     date_deadline: Optional[datetime] = None
+    operator: Optional[str] = None
     parts: List[PartCreate] = []
 
 class PartResponse(BaseModel):
     id: int
     part_name: str
-
+    steps: List[StepCreate] = []
     class Config:
         from_attributes = True
 
@@ -49,6 +55,8 @@ class OrderResponse(BaseModel):
     order_number: str
     client_name: str
     status: str
+    date_deadline: Optional[datetime] = None
+    operator: Optional[str] = None
     parts: List[PartResponse]
 
     class Config:
@@ -82,7 +90,9 @@ def create_order(order: OrderCreate, db: Session = Depends(database.get_db)):
     new_order = models.Order(
         order_number=order.order_number,
         client_name=order.client_name,
-        date_deadline=order.date_deadline
+        date_received=order.date_received,
+        date_deadline=order.date_deadline,
+        operator=order.operator
     )
     db.add(new_order)
     db.commit()
@@ -91,6 +101,11 @@ def create_order(order: OrderCreate, db: Session = Depends(database.get_db)):
     for part in order.parts:
         new_part = models.OrderPart(part_name=part.part_name, order_id=new_order.id)
         db.add(new_part)
+        db.flush()
+
+        for step in part.steps:
+            new_step = models.ProcessStep(step_name=step.step_name, part_id=new_part.id)
+            db.add(new_step)
 
     db.commit()
 
@@ -107,12 +122,15 @@ def get_orders(db: Session = Depends(database.get_db)):
             "id": o.id,
             "order_number": o.order_number,
             "client_name": o.client_name,
+            "date_received": o.date_received,
             "date_deadline": o.date_deadline,
             "status": o.status.value if o.status else None,
+            "operator": o.operator,
             "parts": [
                 {
                     "id": p.id,
-                    "part_name": p.part_name
+                    "part_name": p.part_name,
+                    "steps": [ { "id": s.id, "step_name": s.step_name } for s in p.steps]
                 }
                 for p in o.parts
             ]
@@ -159,3 +177,13 @@ def delete_order(order_id: int, db: Session = Depends(database.get_db)):
     db.commit()
 
     return {"message": "Order deleted"}
+
+@app.put("/orders/{order_id}/operator")
+def assign_operator(order_id: int, operator_name: str, db: Session = Depends(database.get_db)):
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Nie znaleziono zlecenia")
+    
+    order.operator = operator_name if operator_name != "Brak" else None
+    db.commit()
+    return {"message": "Operator przypisany"}

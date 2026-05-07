@@ -27,6 +27,8 @@ class Order(Base):
     # Status
     status = Column(Enum(OrderStatus), default=OrderStatus.IN_QUEUE)
 
+    operator = Column(String, nullable=True)
+
     # Relationship: One order can have multiple parts
     parts = relationship("OrderPart", back_populates="owner", cascade="all, delete-orphan")
 
@@ -39,3 +41,14 @@ class OrderPart(Base):
     order_id = Column(Integer, ForeignKey("orders.id"))
 
     owner = relationship("Order", back_populates="parts")
+    steps = relationship("ProcessStep", back_populates="owner_part", cascade="all, delete-orphan")
+
+class ProcessStep(Base):
+    __tablename__ = "process_steps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    step_name = Column(String, nullable=False)
+    status = Column(Enum(OrderStatus), default=OrderStatus.IN_QUEUE)
+
+    part_id = Column(Integer, ForeignKey("order_parts.id"))
+    owner_part = relationship("OrderPart", back_populates="steps")

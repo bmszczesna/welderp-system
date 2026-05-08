@@ -45,9 +45,37 @@ jobs:
           cat final_data.json >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
-      - name: Append to Google Sheets
-        uses: jakejarvis/google-spreadsheets-append-action@v0.3.0
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          spreadsheet-id: ${{ secrets.DOCUMENT_ID }}
-          service-account-key: ${{ secrets.GOOGLE_CREDENTIALS }}
-          values: ${{ env.JSON_DATA }} # Передаем готовую переменную
+          python-version: '3.10'
+
+      - name: Install Google API dependencies
+        run: pip install google-api-python-client google-auth
+
+      - name: Append to Google Sheets using Python
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          DOCUMENT_ID: ${{ secrets.DOCUMENT_ID }}
+        run: |
+          python -c "
+          import json, os
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+
+          creds_json = json.loads(os.environ['GOOGLE_CREDENTIALS'])
+          creds = service_account.Credentials.from_service_account_info(
+              creds_json, 
+              scopes=['https://www.googleapis.com/auth/spreadsheets']
+          )
+          
+          service = build('sheets', 'v4', credentials=creds)
+          data = json.loads(os.environ['JSON_DATA'])
+          
+          service.spreadsheets().values().append(
+              spreadsheetId=os.environ['DOCUMENT_ID'],
+              range='A1', 
+              valueInputOption='USER_ENTERED',
+              body={'values': data}
+          ).execute()
+          "

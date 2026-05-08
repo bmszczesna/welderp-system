@@ -1,5 +1,8 @@
 name: Sync PM Data to Google Sheets
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true 
+
 on:
   issues:
     types: [opened, closed, reopened]
@@ -7,6 +10,11 @@ on:
     types: [opened, closed, reopened]
   
   workflow_dispatch:
+
+permissions:
+  issues: read
+  pull-requests: read
+  contents: read
 
 jobs:
   sync:
@@ -23,6 +31,7 @@ jobs:
             echo "Fetching all historical data..."
             gh issue list --state all --limit 100 --json title,author,state,url --template '{{range .}}["Issue","{{.title}}","{{.author.login}}","{{.state}}","{{.url}}"],{{end}}' > data.json
             gh pr list --state all --limit 100 --json title,author,state,url --template '{{range .}}["PR","{{.title}}","{{.author.login}}","{{.state}}","{{.url}}"],{{end}}' >> data.json
+            sed -i '$ s/,$//' data.json 
           else
             echo "Fetching current event data..."
             if [[ "${{ github.event.issue }}" != "" ]]; then
@@ -32,18 +41,7 @@ jobs:
             fi
           fi
           
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            sed -i '$ s/,$//' data.json 
-            echo "[$(cat data.json)]" > final_data.json
-          else
-            echo "[$(cat data.json)]" > final_data.json
-          fi
-
-      - name: Load Data into Environment
-        run: |
-          echo "JSON_DATA<<EOF" >> $GITHUB_ENV
-          cat final_data.json >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
+          echo "[$(cat data.json)]" > final_data.json
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -63,19 +61,35 @@ jobs:
           from google.oauth2 import service_account
           from googleapiclient.discovery import build
 
-          creds_json = json.loads(os.environ['GOOGLE_CREDENTIALS'])
+          try:
+              creds_json = json.loads(os.environ['GOOGLE_CREDENTIALS'])
+          except Exception as e:
+              print('Проблема с секретом GOOGLE_CREDENTIALS')
+              raise e
+          
           creds = service_account.Credentials.from_service_account_info(
               creds_json, 
               scopes=['https://www.googleapis.com/auth/spreadsheets']
           )
-          
           service = build('sheets', 'v4', credentials=creds)
-          data = json.loads(os.environ['JSON_DATA'])
           
-          service.spreadsheets().values().append(
-              spreadsheetId=os.environ['DOCUMENT_ID'],
-              range='A1', 
-              valueInputOption='USER_ENTERED',
-              body={'values': data}
-          ).execute()
+          try:
+              with open('final_data.json', 'r', encoding='utf-8') as f:
+                  raw_content = f.read()
+                  data = json.loads(raw_content)
+          except json.JSONDecodeError:
+              print('ОШИБКА: Неправильный формат данных (возможно, мешают кавычки в названиях тикетов).')
+              print('Собранный текст:', raw_content)
+              raise
+          
+          if not data:
+              print('Нет данных для отправки.')
+          else:
+              service.spreadsheets().values().append(
+                  spreadsheetId=os.environ['DOCUMENT_ID'],
+                  range='A1', 
+                  valueInputOption='USER_ENTERED',
+                  body={'values': data}
+              ).execute()
+              print('Данные успешно отправлены в таблицу!')
           "

@@ -28,10 +28,13 @@ app.add_middleware(
 
 class StepCreate(BaseModel):
     step_name: str
+    operator: Optional[str] = None
 
 class PartCreate(BaseModel):
     part_name: str
     steps: List[StepCreate] = []
+    operator: Optional[str] = None
+
 
 
 class OrderCreate(BaseModel):
@@ -45,6 +48,7 @@ class OrderCreate(BaseModel):
 class PartResponse(BaseModel):
     id: int
     part_name: str
+    operator: Optional[str] = None
     steps: List[StepCreate] = []
     class Config:
         from_attributes = True
@@ -99,12 +103,12 @@ def create_order(order: OrderCreate, db: Session = Depends(database.get_db)):
     db.refresh(new_order)
 
     for part in order.parts:
-        new_part = models.OrderPart(part_name=part.part_name, order_id=new_order.id)
+        new_part = models.OrderPart(part_name=part.part_name, order_id=new_order.id, operator=part.operator)
         db.add(new_part)
         db.flush()
 
         for step in part.steps:
-            new_step = models.ProcessStep(step_name=step.step_name, part_id=new_part.id)
+            new_step = models.ProcessStep(step_name=step.step_name, part_id=new_part.id, operator=step.operator)
             db.add(new_step)
 
     db.commit()
@@ -130,7 +134,8 @@ def get_orders(db: Session = Depends(database.get_db)):
                 {
                     "id": p.id,
                     "part_name": p.part_name,
-                    "steps": [ { "id": s.id, "step_name": s.step_name } for s in p.steps]
+                    "operator": p.operator,
+                    "steps": [ { "id": s.id, "step_name": s.step_name, "operator": s.operator } for s in p.steps]
                 }
                 for p in o.parts
             ]

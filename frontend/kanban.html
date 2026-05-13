@@ -14,6 +14,9 @@
 			</div>
 			<div class="actions">
 				<button class="btn" type="button" id="refreshBtn">Odśwież</button>
+				<button class="btn" type="button" onclick="downloadAIReport()" style="border-color: #8b5cf6; color: #8b5cf6;">
+					  Raport produkcyjny
+				</button>
 				<button class="btn btn-primary" type="button" id="newOrderBtn">Nowe zlecenie</button>
 			</div>
 		</header>
@@ -331,6 +334,31 @@
 
 		setupDropZones();
 		loadOrders();
+
+		async function downloadAIReport() {
+			showMessage("AI generuje raport PDF...", "info");
+
+			try {
+				const response = await fetch("/reports/ai-pdf"); // Endpoint w main.py
+
+				if (!response.ok) throw new Error("Błąd generowania raportu");
+
+				const blob = await response.blob();
+				const url = window.URL.createObjectURL(blob);
+				const a = document.createElement('a');
+
+				a.href = url;
+				a.download = `Raport_Produkcyjny_AI_${new Date().toISOString().slice(0,10)}.pdf`;
+				document.body.appendChild(a);
+				a.click();
+				window.URL.revokeObjectURL(url);
+
+				showMessage("Raport pobrany pomyślnie", "success");
+			} catch (error) {
+				console.error(error);
+				showMessage("Nie udało się pobrać raportu AI", "error");
+			}
+		}
 	</script>
 </body>
 </html>

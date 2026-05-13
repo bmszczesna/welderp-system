@@ -12,8 +12,10 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from weasyprint import HTML
 import io
+import google.generativeai as genai
 
-
+genai.configure(api_key="AIzaSyCK2JK6FfJ-9GZZ0vL196k-spy2g2IXRFY")
+ai_model = genai.GenerativeModel('models/gemini-3-flash-preview')
 models.Base.metadata.create_all(bind=database.engine)
 
 UPLOAD_DIR = "uploads"
@@ -264,5 +266,75 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
         media_type="application/pdf",
         headers={
             "Content-Disposition": f"attachment; filename=zlecenie_{order.order_number}.pdf"
+        }
+    )
+
+
+@app.get("/reports/ai-pdf")
+def get_ai_report_pdf(db: Session = Depends(database.get_db)):
+    # 1. Pobieranie danych z bazy
+    orders = db.query(models.Order).all()
+
+    production_data = []
+    for o in orders:
+        production_data.append({
+            "nr": o.order_number,
+            "klient": o.client_name,
+            "status": o.status.value if o.status else "Brak",
+            "termin": str(o.date_deadline) if o.date_deadline else "Brak",
+            "czesci": [p.part_name for p in o.parts]
+        })
+
+    # 2. Generowanie analizy przez AI
+    prompt = f"""
+    Jesteś ekspertem ds. produkcji WeldERP. Przeanalizuj te dane: {production_data}
+    Przygotuj raport:
+    1. Statystyki statusów.
+    2. Zlecenia zagrożone (terminy).
+    3. Wąskie gardła.
+    4. Wniosek optymalizacyjny.
+    Użyj formatowania HTML (p, br, b, ul, li) w odpowiedzi.
+    """
+
+    try:
+        ai_response = ai_model.generate_content(prompt)
+        ai_analysis_html = ai_response.text
+    except Exception as e:
+        ai_analysis_html = f"<p>Błąd generowania analizy AI: {str(e)}</p>"
+
+    # 3. Tworzenie szablonu HTML dla PDF
+    report_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            @page {{ size: A4; margin: 20mm; }}
+            body {{ font-family: DejaVu Sans, sans-serif; line-height: 1.6; color: #1f2937; }}
+            h1 {{ color: #8b5cf6; border-bottom: 2px solid #8b5cf6; padding-bottom: 10px; }}
+            .report-box {{ background: #f9fafb; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb; }}
+            .footer {{ margin-top: 30px; font-size: 10px; text-align: center; color: #9ca3af; }}
+        </style>
+    </head>
+    <body>
+        <h1>Inteligentny Raport Produkcyjny WeldERP</h1>
+        <div class="report-box">
+            {ai_analysis_html}
+        </div>
+        <div class="footer">
+            Wygenerowano automatycznie przez WeldERP AI • {datetime.now().strftime('%Y-%m-%d %H:%M')}
+        </div>
+    </body>
+    </html>
+    """
+
+    # 4. Generowanie PDF
+    pdf_bytes = HTML(string=report_html).write_pdf()
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=raport_ai_{datetime.now().strftime('%d_%m_%Y')}.pdf"
         }
     )

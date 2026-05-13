@@ -1,5 +1,7 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
+import shutil
+import os
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
@@ -12,9 +14,15 @@ from fastapi.staticfiles import StaticFiles
 
 models.Base.metadata.create_all(bind=database.engine)
 
+UPLOAD_DIR = "uploads"
+
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
 app = FastAPI(title="WeldERP - Order Management API")
 
 app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -42,19 +50,27 @@ class OrderCreate(BaseModel):
     operator: Optional[str] = None
     parts: List[PartCreate] = []
 
+class StepResponse(BaseModel):
+    id: int
+    step_name: str
+    pdf_path: Optional[str] = None
+    class Config:
+        from_attributes = True
+
 class PartResponse(BaseModel):
     id: int
     part_name: str
-    steps: List[StepCreate] = []
+    steps: List[StepResponse] = []
     class Config:
         from_attributes = True
+
 
 
 class OrderResponse(BaseModel):
     id: int
     order_number: str
     client_name: str
-    status: str
+    status: OrderStatus
     date_deadline: Optional[datetime] = None
     operator: Optional[str] = None
     parts: List[PartResponse]
@@ -130,7 +146,8 @@ def get_orders(db: Session = Depends(database.get_db)):
                 {
                     "id": p.id,
                     "part_name": p.part_name,
-                    "steps": [ { "id": s.id, "step_name": s.step_name } for s in p.steps]
+                    "steps": [ { "id": s.id, "step_name": s.step_name, "pdf_path": s.pdf_path } for s in p.steps]
+
                 }
                 for p in o.parts
             ]
@@ -187,3 +204,21 @@ def assign_operator(order_id: int, operator_name: str, db: Session = Depends(dat
     order.operator = operator_name if operator_name != "Brak" else None
     db.commit()
     return {"message": "Operator przypisany"}
+
+
+@app.post("/steps/{step_id}/upload-pdf")
+async def upload_step_pdf(step_id: int, file: UploadFile = File(...), db: Session = Depends(database.get_db)):
+    step = db.query(models.ProcessStep).filter(models.ProcessStep.id == step_id).first()
+    if not step:
+        raise HTTPException(status_code=404, detail="Krok nie istnieje")
+
+    if not file.filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Tylko pliki PDF są dozwolone")
+
+    file_path = os.path.join(UPLOAD_DIR, f"step_{step_id}_{file.filename}")
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    step.pdf_path = file_path
+    db.commit()
+    return {"pdf_path": file_path}

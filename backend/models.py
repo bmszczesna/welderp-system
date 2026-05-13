@@ -50,5 +50,7 @@ class ProcessStep(Base):
     step_name = Column(String, nullable=False)
     status = Column(Enum(OrderStatus), default=OrderStatus.IN_QUEUE)
 
+    pdf_path = Column(String, nullable=True)
+
     part_id = Column(Integer, ForeignKey("order_parts.id"))
     owner_part = relationship("OrderPart", back_populates="steps")

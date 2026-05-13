@@ -143,7 +143,16 @@
 					if (part.steps && part.steps.length > 0) {
 						partsHtml += `<ul class="modal-steps-list">`;
 						part.steps.forEach(step => {
-							partsHtml += `<li>${step.step_name}</li>`;
+							const pdfButton = step.pdf_path
+							   ? `<a href="/${step.pdf_path}" target="_blank" class="pdf-badge">PDF</a>`
+							   : "";
+
+							// Używamy div z flexboxem, aby przycisk był zawsze po prawej stronie
+							partsHtml += `
+								<li class="step-item">
+									<span class="step-text">${step.step_name}</span>
+									${pdfButton}
+								</li>`;
 						});
 						partsHtml += `</ul>`;
 					}

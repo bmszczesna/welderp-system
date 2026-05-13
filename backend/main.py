@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response
 from sqlalchemy.orm import Session
 import shutil
 import os
@@ -8,8 +8,10 @@ from datetime import datetime
 from backend import models
 from backend import database
 from backend.models import OrderStatus
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from weasyprint import HTML
+import io
 
 
 models.Base.metadata.create_all(bind=database.engine)
@@ -222,3 +224,45 @@ async def upload_step_pdf(step_id: int, file: UploadFile = File(...), db: Sessio
     step.pdf_path = file_path
     db.commit()
     return {"pdf_path": file_path}
+
+
+@app.get("/orders/{order_id}/pdf")
+def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    parts_html = ""
+    for part in order.parts:
+        steps_list = "".join([f"<li>{s.step_name}</li>" for s in part.steps])
+        parts_html += f"<h3>Część: {part.part_name}</h3><ul>{steps_list}</ul>"
+
+    full_html = f"""
+    <html>
+        <head>
+            <style>
+                @page {{ size: A4; margin: 15mm; }}
+                body {{ font-family: sans-serif; }}
+                h1 {{ color: #ef4444; border-bottom: 2px solid #ef4444; }}
+                h3 {{ background: #f3f4f6; padding: 5px; }}
+            </style>
+        </head>
+        <body>
+            <h1>Zlecenie: {order.order_number}</h1>
+            <p><strong>Klient:</strong> {order.client_name}</p>
+            <p><strong>Termin:</strong> {order.date_deadline.strftime('%Y-%m-%d') if order.date_deadline else '-'}</p>
+            <hr>
+            {parts_html}
+        </body>
+    </html>
+    """
+
+    pdf_bytes = HTML(string=full_html).write_pdf()
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=zlecenie_{order.order_number}.pdf"
+        }
+    )

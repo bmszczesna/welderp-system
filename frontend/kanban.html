@@ -125,7 +125,12 @@
 				"COMPLETED": "var(--done)"
 			};
 
-			document.getElementById('modalOrderNumber').textContent = "Zlecenie: " + order.order_number;
+			document.getElementById('modalOrderNumber').innerHTML = `
+				<span>Zlecenie: ${order.order_number}</span>
+				<a href="/orders/${order.id}/pdf" class="btn-download" title="Pobierz kartę zlecenia">
+					<span class="icon"></span> Karta PDF
+				</a>
+			`;
 			document.getElementById('modalClient').textContent = order.client_name;
 			document.getElementById('modalOperator').textContent = order.operator || "Nie przypisano";
 			document.getElementById('modalDateReceived').textContent = order.date_received ? order.date_received.slice(0, 10) : "2026-05-18"; 
@@ -147,7 +152,6 @@
 							   ? `<a href="/${step.pdf_path}" target="_blank" class="pdf-badge">PDF</a>`
 							   : "";
 
-							// Używamy div z flexboxem, aby przycisk był zawsze po prawej stronie
 							partsHtml += `
 								<li class="step-item">
 									<span class="step-text">${step.step_name}</span>

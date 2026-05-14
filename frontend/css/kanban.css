@@ -371,3 +371,20 @@ body {
 .info-btn { background: transparent; border: none; font-size: 16px; cursor: pointer; opacity: 0.6; transition: 0.2s;}
 .info-btn:hover { opacity: 1; transform: scale(1.1);}
 .order-deadline { font-size: 12px; color: #ef4444; font-weight: bold; margin: 4px 0 0 0; }
+
+.pdf-badge {
+    background-color: #ef4444;
+    color: white !important;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+    text-decoration: none;
+    transition: background 0.2s;
+    margin-left: 10px;
+}
+
+.pdf-badge:hover {
+    background-color: #b91c1c;
+    transform: scale(1.05);
+}

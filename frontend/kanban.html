@@ -14,6 +14,9 @@
 			</div>
 			<div class="actions">
 				<button class="btn" type="button" id="refreshBtn">Odśwież</button>
+				<button class="btn" type="button" onclick="downloadAIReport()" style="border-color: #8b5cf6; color: #8b5cf6;">
+					  Raport produkcyjny
+				</button>
 				<button class="btn btn-primary" type="button" id="newOrderBtn">Nowe zlecenie</button>
 			</div>
 		</header>
@@ -125,7 +128,12 @@
 				"COMPLETED": "var(--done)"
 			};
 
-			document.getElementById('modalOrderNumber').textContent = "Zlecenie: " + order.order_number;
+			document.getElementById('modalOrderNumber').innerHTML = `
+				<span>Zlecenie: ${order.order_number}</span>
+				<a href="/orders/${order.id}/pdf" class="btn-download" title="Pobierz kartę zlecenia">
+					<span class="icon"></span> Karta PDF
+				</a>
+			`;
 			document.getElementById('modalClient').textContent = order.client_name;
 			document.getElementById('modalOperator').textContent = order.operator || "Nie przypisano";
 			document.getElementById('modalDateReceived').textContent = order.date_received ? order.date_received.slice(0, 10) : "2026-05-18"; 
@@ -139,20 +147,29 @@
 			if (order.parts && order.parts.length > 0) {
 				partsHtml = `<ol class="modal-parts-list">`;
 				order.parts.forEach(part => {
-					let partOperatorHtml = part.operator 
-						? `<span style="font-size: 12px; color: #1e40af; background: #dbeafe; padding: 2px 8px; border-radius: 12px; margin-left: 10px; white-space: nowrap;">👤 ${part.operator}</span>` 
+					let partOperatorHtml = part.operator
+						? `<span style="font-size: 12px; color: #1e40af; background: #dbeafe; padding: 2px 8px; border-radius: 12px; margin-left: 10px; white-space: nowrap;">👤 ${part.operator}</span>`
 						: `<span style="font-size: 12px; color: #6b7280; background: #f3f4f6; padding: 2px 8px; border-radius: 12px; margin-left: 10px; white-space: nowrap;">👤 Operator główny</span>`;
 
 					partsHtml += `<li style="margin-bottom: 8px;"><span class="part-name-text" style="font-weight: 600;">${part.part_name}</span>${partOperatorHtml}`;
-					
+
 					if (part.steps && part.steps.length > 0) {
 						partsHtml += `<ul class="modal-steps-list" style="margin-top: 5px;">`;
 						part.steps.forEach(step => {
-							let stepOperatorHtml = step.operator 
-								? `<span style="font-size: 11px; color: #4b5563; margin-left: 8px; font-style: italic;">(Odp: ${step.operator})</span>` 
+							const stepOperatorHtml = step.operator
+								? `<span style="font-size: 11px; color: #4b5563; margin-left: 8px; font-style: italic;">(Odp: ${step.operator})</span>`
 								: '';
 
-							partsHtml += `<li style="margin-bottom: 3px;">${step.step_name} ${stepOperatorHtml}</li>`;
+							const pdfButton = step.pdf_path
+								? `<a href="/${step.pdf_path}" target="_blank" class="pdf-badge" style="margin-left: 8px;">PDF</a>`
+								: "";
+
+							partsHtml += `
+								<li class="step-item" style="display: flex; align-items: center; margin-bottom: 5px;">
+									<span class="step-text">${step.step_name}</span>
+									${stepOperatorHtml}
+									${pdfButton}
+								</li>`;
 						});
 						partsHtml += `</ul>`;
 					}
@@ -327,6 +344,31 @@
 
 		setupDropZones();
 		loadOrders();
+
+		async function downloadAIReport() {
+			showMessage("AI generuje raport PDF...", "info");
+
+			try {
+				const response = await fetch("/reports/ai-pdf"); // Endpoint w main.py
+
+				if (!response.ok) throw new Error("Błąd generowania raportu");
+
+				const blob = await response.blob();
+				const url = window.URL.createObjectURL(blob);
+				const a = document.createElement('a');
+
+				a.href = url;
+				a.download = `Raport_Produkcyjny_AI_${new Date().toISOString().slice(0,10)}.pdf`;
+				document.body.appendChild(a);
+				a.click();
+				window.URL.revokeObjectURL(url);
+
+				showMessage("Raport pobrany pomyślnie", "success");
+			} catch (error) {
+				console.error(error);
+				showMessage("Nie udało się pobrać raportu AI", "error");
+			}
+		}
 	</script>
 </body>
 </html>

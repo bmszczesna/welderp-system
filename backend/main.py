@@ -1,20 +1,38 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response
 from sqlalchemy.orm import Session
+import shutil
+import os
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 from backend import models
 from backend import database
 from backend.models import OrderStatus
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
+from weasyprint import HTML
+import io
+import google.generativeai as genai
 
+api_key = os.getenv("GEMINI_API_KEY")
 
+if not api_key:
+    print("BŁĄD: Brak klucza API Gemini w zmiennych środowiskowych!")
+else:
+    genai.configure(api_key=api_key)
+
+ai_model = genai.GenerativeModel('models/gemini-3-flash-preview')
 models.Base.metadata.create_all(bind=database.engine)
+
+UPLOAD_DIR = "uploads"
+
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
 
 app = FastAPI(title="WeldERP - Order Management API")
 
 app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -45,20 +63,28 @@ class OrderCreate(BaseModel):
     operator: Optional[str] = None
     parts: List[PartCreate] = []
 
+class StepResponse(BaseModel):
+    id: int
+    step_name: str
+    pdf_path: Optional[str] = None
+    class Config:
+        from_attributes = True
+
 class PartResponse(BaseModel):
     id: int
     part_name: str
     operator: Optional[str] = None
-    steps: List[StepCreate] = []
+    steps: List[StepResponse] = []
     class Config:
         from_attributes = True
+
 
 
 class OrderResponse(BaseModel):
     id: int
     order_number: str
     client_name: str
-    status: str
+    status: OrderStatus
     date_deadline: Optional[datetime] = None
     operator: Optional[str] = None
     parts: List[PartResponse]
@@ -135,7 +161,7 @@ def get_orders(db: Session = Depends(database.get_db)):
                     "id": p.id,
                     "part_name": p.part_name,
                     "operator": p.operator,
-                    "steps": [ { "id": s.id, "step_name": s.step_name, "operator": s.operator } for s in p.steps]
+                    "steps": [ { "id": s.id, "step_name": s.step_name, "operator": s.operator, "pdf_path": s.pdf_path} for s in p.steps]
                 }
                 for p in o.parts
             ]
@@ -192,3 +218,133 @@ def assign_operator(order_id: int, operator_name: str, db: Session = Depends(dat
     order.operator = operator_name if operator_name != "Brak" else None
     db.commit()
     return {"message": "Operator przypisany"}
+
+
+@app.post("/steps/{step_id}/upload-pdf")
+async def upload_step_pdf(step_id: int, file: UploadFile = File(...), db: Session = Depends(database.get_db)):
+    step = db.query(models.ProcessStep).filter(models.ProcessStep.id == step_id).first()
+    if not step:
+        raise HTTPException(status_code=404, detail="Krok nie istnieje")
+
+    if not file.filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Tylko pliki PDF są dozwolone")
+
+    file_path = os.path.join(UPLOAD_DIR, f"step_{step_id}_{file.filename}")
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+
+    step.pdf_path = file_path
+    db.commit()
+    return {"pdf_path": file_path}
+
+
+@app.get("/orders/{order_id}/pdf")
+def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    parts_html = ""
+    for part in order.parts:
+        steps_list = "".join([f"<li>{s.step_name}</li>" for s in part.steps])
+        parts_html += f"<h3>Część: {part.part_name}</h3><ul>{steps_list}</ul>"
+
+    full_html = f"""
+    <html>
+        <head>
+            <style>
+                @page {{ size: A4; margin: 15mm; }}
+                body {{ font-family: sans-serif; }}
+                h1 {{ color: #ef4444; border-bottom: 2px solid #ef4444; }}
+                h3 {{ background: #f3f4f6; padding: 5px; }}
+            </style>
+        </head>
+        <body>
+            <h1>Zlecenie: {order.order_number}</h1>
+            <p><strong>Klient:</strong> {order.client_name}</p>
+            <p><strong>Termin:</strong> {order.date_deadline.strftime('%Y-%m-%d') if order.date_deadline else '-'}</p>
+            <hr>
+            {parts_html}
+        </body>
+    </html>
+    """
+
+    pdf_bytes = HTML(string=full_html).write_pdf()
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=zlecenie_{order.order_number}.pdf"
+        }
+    )
+
+
+@app.get("/reports/ai-pdf")
+def get_ai_report_pdf(db: Session = Depends(database.get_db)):
+    # 1. Pobieranie danych z bazy
+    orders = db.query(models.Order).all()
+
+    production_data = []
+    for o in orders:
+        production_data.append({
+            "nr": o.order_number,
+            "klient": o.client_name,
+            "status": o.status.value if o.status else "Brak",
+            "termin": str(o.date_deadline) if o.date_deadline else "Brak",
+            "czesci": [p.part_name for p in o.parts]
+        })
+
+    # 2. Generowanie analizy przez AI
+    prompt = f"""
+    Jesteś ekspertem ds. produkcji WeldERP. Przeanalizuj te dane: {production_data}
+    Przygotuj raport:
+    1. Statystyki statusów.
+    2. Zlecenia zagrożone (terminy).
+    3. Wąskie gardła.
+    4. Wniosek optymalizacyjny.
+    Użyj formatowania HTML (p, br, b, ul, li) w odpowiedzi.
+    """
+
+    try:
+        ai_response = ai_model.generate_content(prompt)
+        ai_analysis_html = ai_response.text
+    except Exception as e:
+        ai_analysis_html = f"<p>Błąd generowania analizy AI: {str(e)}</p>"
+
+    # 3. Tworzenie szablonu HTML dla PDF
+    report_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <style>
+            @page {{ size: A4; margin: 20mm; }}
+            body {{ font-family: DejaVu Sans, sans-serif; line-height: 1.6; color: #1f2937; }}
+            h1 {{ color: #8b5cf6; border-bottom: 2px solid #8b5cf6; padding-bottom: 10px; }}
+            .report-box {{ background: #f9fafb; padding: 20px; border-radius: 8px; border: 1px solid #e5e7eb; }}
+            .footer {{ margin-top: 30px; font-size: 10px; text-align: center; color: #9ca3af; }}
+        </style>
+    </head>
+    <body>
+        <h1>Inteligentny Raport Produkcyjny WeldERP</h1>
+        <div class="report-box">
+            {ai_analysis_html}
+        </div>
+        <div class="footer">
+            Wygenerowano automatycznie przez WeldERP AI • {datetime.now().strftime('%Y-%m-%d %H:%M')}
+        </div>
+    </body>
+    </html>
+    """
+
+    # 4. Generowanie PDF
+    pdf_bytes = HTML(string=report_html).write_pdf()
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f"attachment; filename=raport_ai_{datetime.now().strftime('%d_%m_%Y')}.pdf"
+        }
+    )

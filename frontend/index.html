@@ -98,6 +98,7 @@
         stepDiv.className = "step-input-group";
         stepDiv.innerHTML = `
             <input type="text" class="step-name" placeholder="Opis kroku (np. Cięcie plazmą)">
+            <input type="file" class="step-pdf" accept=".pdf" style="width: auto; font-size: 11px;">
             <select class="step-operator" style="width: auto; margin: 0; padding: 5px; font-size: 13px;">
                 <option value="">-- Operator z części --</option>
                 <option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
@@ -118,7 +119,7 @@
 
         if (!orderNum || !clientName || !deadline) {
             alert("Błąd: Wypełnij Numer zlecenia, Klienta oraz Deadline!");
-            return; 
+            return;
         }
 
         const payload = {
@@ -130,7 +131,6 @@
             parts: []
         };
 
-        const mainOperator = payload.operator;
         let hasError = false;
         let partCount = 0;
 
@@ -140,27 +140,26 @@
             partCount++;
 
             const partOperatorSelect = partBlock.querySelector(".part-operator").value;
-            const resolvedPartOperator = partOperatorSelect ? partOperatorSelect : mainOperator;
+            const resolvedPartOperator = partOperatorSelect ? partOperatorSelect : payload.operator;
 
             const steps = [];
-            // ИСПРАВЛЕНО: Ищем контейнеры шагов, чтобы достать и имя, и оператора
             partBlock.querySelectorAll(".step-input-group").forEach(stepGroup => {
                 const stepName = stepGroup.querySelector(".step-name").value.trim();
                 const stepOperatorSelect = stepGroup.querySelector(".step-operator").value;
                 const resolvedStepOperator = stepOperatorSelect ? stepOperatorSelect : resolvedPartOperator;
-                
+
                 if(stepName) {
-                    steps.push({ 
-                        step_name: stepName, 
-                        operator: resolvedStepOperator 
+                    steps.push({
+                        step_name: stepName,
+                        operator: resolvedStepOperator
                     });
                 }
             });
 
-            payload.parts.push({ 
-                part_name: partName, 
-                steps: steps, 
-                operator: resolvedPartOperator 
+            payload.parts.push({
+                part_name: partName,
+                steps: steps,
+                operator: resolvedPartOperator
             });
         });
 
@@ -177,21 +176,40 @@
             });
 
             if (res.ok) {
-                alert("Zlecenie utworzone!");
+                const data = await res.json();
+                const orderId = data.order_id;
+
+                // Pobieramy nowo utworzone zlecenie, aby mieć poprawne ID kroków do wysyłki PDF
+                const orderRes = await fetch(`/orders/${orderId}`);
+                const orderData = await orderRes.json();
+
+                const partBlocks = document.querySelectorAll(".part-block");
+                for (let pIdx = 0; pIdx < partBlocks.length; pIdx++) {
+                    const stepInputs = partBlocks[pIdx].querySelectorAll(".step-input-group");
+                    for (let sIdx = 0; sIdx < stepInputs.length; sIdx++) {
+                        const fileInput = stepInputs[sIdx].querySelector(".step-pdf");
+                        if (fileInput && fileInput.files.length > 0) {
+                            const stepObj = orderData.parts[pIdx].steps[sIdx];
+                            if (stepObj && stepObj.id) {
+                                const formData = new FormData();
+                                formData.append("file", fileInput.files[0]);
+                                await fetch(`/steps/${stepObj.id}/upload-pdf`, {
+                                    method: "POST",
+                                    body: formData
+                                });
+                            }
+                        }
+                    }
+                }
+                alert("Zlecenie utworzone pomyślnie!");
                 window.location.href = "/kanban.html";
             } else {
                 const data = await res.json();
-                alert("Błąd API: " + (data.detail || "Sprawdź консоль"));
+                alert("Błąd API: " + (data.detail || "Sprawdź dane"));
             }
         } catch (err) {
-            alert("Błąd połąчения с serwerem");
+            alert("Błąd połączenia z serwerem");
             console.error(err);
-        }
-    }
-    
-    window.onload = () => {
-        if(document.getElementById("partsContainer").children.length === 0) {
-            addPartBlock();
         }
     };
 </script>

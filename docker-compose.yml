@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: welderp_password
       POSTGRES_DB: welderp_db
     ports:
-      - "5432:5432"
+      - "5432:5431"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -23,8 +23,11 @@ services:
       - "8000:8000"
     depends_on:
       - db
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=postgresql://welderp_user:welderp_password@db:5432/welderp_db
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
 
 volumes:
   postgres_data:

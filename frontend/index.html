@@ -74,7 +74,15 @@
         const partDiv = document.createElement("div");
         partDiv.className = "part-block";
         partDiv.innerHTML = `
-            <input type="text" class="part-name" placeholder="Nazwa części (np. Rama Główna)" style="font-weight: bold;">
+            <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                <input type="text" class="part-name" placeholder="Nazwa części (np. Rama Główna)" style="flex-grow: 1; font-weight: bold; margin: 0;">
+                <select class="part-operator" style="width: auto; margin: 0; padding: 5px; font-size: 13px;">
+                    <option value="">-- Operator z zamówienia --</option>
+                    <option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
+                    <option value="Tomasz Nowak">Tomasz Nowak</option>
+                    <option value="Anna Wiśniewska">Anna Wiśniewska</option>
+                </select>
+            </div>
             <div class="stepsContainer"></div>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <button type="button" class="btn-small" onclick="addStepBlock(this)">+ Dodaj krok (np. Spawanie)</button>
@@ -90,6 +98,12 @@
         stepDiv.className = "step-input-group";
         stepDiv.innerHTML = `
             <input type="text" class="step-name" placeholder="Opis kroku (np. Cięcie plazmą)">
+            <select class="step-operator" style="width: auto; margin: 0; padding: 5px; font-size: 13px;">
+                <option value="">-- Operator z części --</option>
+                <option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
+                <option value="Tomasz Nowak">Tomasz Nowak</option>
+                <option value="Anna Wiśniewska">Anna Wiśniewska</option>
+            </select>
             <button type="button" class="btn-small btn-remove" onclick="this.parentElement.remove()">X</button>
         `;
         stepsContainer.appendChild(stepDiv);
@@ -110,12 +124,13 @@
         const payload = {
             order_number: orderNum,
             client_name: clientName,
-            date_received: dateReceived + "T00:00:00",
+            date_received: dateReceived ? dateReceived + "T00:00:00" : new Date().toISOString(),
             date_deadline: deadline + "T00:00:00",
             operator: operatorValue === "Brak" ? null : operatorValue,
             parts: []
         };
 
+        const mainOperator = payload.operator;
         let hasError = false;
         let partCount = 0;
 
@@ -124,34 +139,61 @@
             if (!partName) { hasError = true; return; }
             partCount++;
 
+            const partOperatorSelect = partBlock.querySelector(".part-operator").value;
+            const resolvedPartOperator = partOperatorSelect ? partOperatorSelect : mainOperator;
+
             const steps = [];
-            partBlock.querySelectorAll(".step-name").forEach(stepInput => {
-                if(stepInput.value.trim()) steps.push({ step_name: stepInput.value.trim() });
+            // ИСПРАВЛЕНО: Ищем контейнеры шагов, чтобы достать и имя, и оператора
+            partBlock.querySelectorAll(".step-input-group").forEach(stepGroup => {
+                const stepName = stepGroup.querySelector(".step-name").value.trim();
+                const stepOperatorSelect = stepGroup.querySelector(".step-operator").value;
+                const resolvedStepOperator = stepOperatorSelect ? stepOperatorSelect : resolvedPartOperator;
+                
+                if(stepName) {
+                    steps.push({ 
+                        step_name: stepName, 
+                        operator: resolvedStepOperator 
+                    });
+                }
             });
-            payload.parts.push({ part_name: partName, steps: steps });
+
+            payload.parts.push({ 
+                part_name: partName, 
+                steps: steps, 
+                operator: resolvedPartOperator 
+            });
         });
 
         if (partCount === 0 || hasError) {
-            alert("Błąd: Zlecenie musi mieć poprawne części (nazwy nie mogą być puste)!");
+            alert("Błąd: Zlecenie musi mieć poprawne części!");
             return;
         }
 
-        const res = await fetch("/orders/", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify(payload)
-        });
+        try {
+            const res = await fetch("/orders/", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(payload)
+            });
 
-        if (res.ok) {
-            alert("Zlecenie utworzone!");
-            window.location.reload();
-        } else {
-            const data = await res.json();
-            alert("Błąd: " + (data.detail || "Sprawdź dane"));
+            if (res.ok) {
+                alert("Zlecenie utworzone!");
+                window.location.href = "/kanban.html";
+            } else {
+                const data = await res.json();
+                alert("Błąd API: " + (data.detail || "Sprawdź консоль"));
+            }
+        } catch (err) {
+            alert("Błąd połąчения с serwerem");
+            console.error(err);
         }
     }
     
-    window.onload = () => addPartBlock();
+    window.onload = () => {
+        if(document.getElementById("partsContainer").children.length === 0) {
+            addPartBlock();
+        }
+    };
 </script>
 </body>
 </html>

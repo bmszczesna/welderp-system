@@ -139,11 +139,20 @@
 			if (order.parts && order.parts.length > 0) {
 				partsHtml = `<ol class="modal-parts-list">`;
 				order.parts.forEach(part => {
-					partsHtml += `<li><span class="part-name-text">${part.part_name}</span>`;
+					let partOperatorHtml = part.operator 
+						? `<span style="font-size: 12px; color: #1e40af; background: #dbeafe; padding: 2px 8px; border-radius: 12px; margin-left: 10px; white-space: nowrap;">👤 ${part.operator}</span>` 
+						: `<span style="font-size: 12px; color: #6b7280; background: #f3f4f6; padding: 2px 8px; border-radius: 12px; margin-left: 10px; white-space: nowrap;">👤 Operator główny</span>`;
+
+					partsHtml += `<li style="margin-bottom: 8px;"><span class="part-name-text" style="font-weight: 600;">${part.part_name}</span>${partOperatorHtml}`;
+					
 					if (part.steps && part.steps.length > 0) {
-						partsHtml += `<ul class="modal-steps-list">`;
+						partsHtml += `<ul class="modal-steps-list" style="margin-top: 5px;">`;
 						part.steps.forEach(step => {
-							partsHtml += `<li>${step.step_name}</li>`;
+							let stepOperatorHtml = step.operator 
+								? `<span style="font-size: 11px; color: #4b5563; margin-left: 8px; font-style: italic;">(Odp: ${step.operator})</span>` 
+								: '';
+
+							partsHtml += `<li style="margin-bottom: 3px;">${step.step_name} ${stepOperatorHtml}</li>`;
 						});
 						partsHtml += `</ul>`;
 					}

@@ -388,3 +388,34 @@ body {
     background-color: #b91c1c;
     transform: scale(1.05);
 }
+
+.archive-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    opacity: 0.7;
+    transition: 0.2s;
+}
+
+.archive-btn:hover {
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+.archive-btn-large {
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background: #6b7280;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.archive-btn-large:hover {
+    background: #374151;
+}

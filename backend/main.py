@@ -85,7 +85,10 @@ class OrderResponse(BaseModel):
     order_number: str
     client_name: str
     status: OrderStatus
+
+    date_received: Optional[datetime] = None
     date_deadline: Optional[datetime] = None
+
     operator: Optional[str] = None
     parts: List[PartResponse]
 
@@ -107,6 +110,10 @@ def serve_kanban():
 @app.get("/kanban.html")
 def serve_kanban_html():
     return FileResponse("frontend/kanban.html")
+
+@app.get("/archive.html")
+def serve_archive_html():
+    return FileResponse("frontend/archive.html")
 
 
 @app.post("/orders/", status_code=201)

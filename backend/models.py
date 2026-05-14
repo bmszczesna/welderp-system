@@ -10,6 +10,7 @@ class OrderStatus(enum.Enum):
     IN_PROGRESS = "IN_PROGRESS"
     QUALITY_CHECK = "QUALITY_CHECK"
     COMPLETED = "COMPLETED"
+    ARCHIVED = "ARCHIVED"
 
 
 class Order(Base):

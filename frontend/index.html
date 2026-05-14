@@ -119,7 +119,7 @@
 
         if (!orderNum || !clientName || !deadline) {
             alert("Błąd: Wypełnij Numer zlecenia, Klienta oraz Deadline!");
-            return; 
+            return;
         }
 
         const payload = {
@@ -131,7 +131,6 @@
             parts: []
         };
 
-        const mainOperator = payload.operator;
         let hasError = false;
         let partCount = 0;
 
@@ -141,10 +140,9 @@
             partCount++;
 
             const partOperatorSelect = partBlock.querySelector(".part-operator").value;
-            const resolvedPartOperator = partOperatorSelect ? partOperatorSelect : mainOperator;
+            const resolvedPartOperator = partOperatorSelect ? partOperatorSelect : payload.operator;
 
             const steps = [];
-            // ИСПРАВЛЕНО: Ищем контейнеры шагов, чтобы достать и имя, и оператора
             partBlock.querySelectorAll(".step-input-group").forEach(stepGroup => {
                 const stepName = stepGroup.querySelector(".step-name").value.trim();
                 const stepOperatorSelect = stepGroup.querySelector(".step-operator").value;
@@ -178,58 +176,40 @@
             });
 
             if (res.ok) {
-                alert("Zlecenie utworzone!");
-                window.location.href = "/kanban.html";
-            } else {
                 const data = await res.json();
-                alert("Błąd API: " + (data.detail || "Sprawdź консоль"));
-            }
-        } catch (err) {
-            alert("Błąd połąчения с serwerem");
-            console.error(err);
-        if (res.ok) {
-            const data = await res.json();
-            const orderId = data.order_id;
+                const orderId = data.order_id;
 
-            const orderRes = await fetch(`/orders/${orderId}`);
-            const orderData = await orderRes.json();
+                // Pobieramy nowo utworzone zlecenie, aby mieć poprawne ID kroków do wysyłki PDF
+                const orderRes = await fetch(`/orders/${orderId}`);
+                const orderData = await orderRes.json();
 
-            const partBlocks = document.querySelectorAll(".part-block");
-
-            for (let pIdx = 0; pIdx < partBlocks.length; pIdx++) {
-                const stepInputs = partBlocks[pIdx].querySelectorAll(".step-input-group");
-                for (let sIdx = 0; sIdx < stepInputs.length; sIdx++) {
-                    const fileInput = stepInputs[sIdx].querySelector(".step-pdf");
-
-                    if (fileInput && fileInput.files.length > 0) {
-                        // Dodaj logowanie do konsoli, aby sprawdzić czy ID istnieje
-                        const stepObj = orderData.parts[pIdx].steps[sIdx];
-
-                        if (stepObj && stepObj.id) {
-                            const formData = new FormData();
-                            formData.append("file", fileInput.files[0]);
-
-                            await fetch(`/steps/${stepObj.id}/upload-pdf`, {
-                                method: "POST",
-                                body: formData
-                            });
-                        } else {
-                            console.error("Błąd: Nie znaleziono ID dla kroku", sIdx, "części", pIdx);
+                const partBlocks = document.querySelectorAll(".part-block");
+                for (let pIdx = 0; pIdx < partBlocks.length; pIdx++) {
+                    const stepInputs = partBlocks[pIdx].querySelectorAll(".step-input-group");
+                    for (let sIdx = 0; sIdx < stepInputs.length; sIdx++) {
+                        const fileInput = stepInputs[sIdx].querySelector(".step-pdf");
+                        if (fileInput && fileInput.files.length > 0) {
+                            const stepObj = orderData.parts[pIdx].steps[sIdx];
+                            if (stepObj && stepObj.id) {
+                                const formData = new FormData();
+                                formData.append("file", fileInput.files[0]);
+                                await fetch(`/steps/${stepObj.id}/upload-pdf`, {
+                                    method: "POST",
+                                    body: formData
+                                });
+                            }
                         }
                     }
                 }
+                alert("Zlecenie utworzone pomyślnie!");
+                window.location.href = "/kanban.html";
+            } else {
+                const data = await res.json();
+                alert("Błąd API: " + (data.detail || "Sprawdź dane"));
             }
-            alert("Zlecenie i pliki utworzone!");
-            window.location.reload();
-        } else {
-            const data = await res.json();
-            alert("Błąd: " + (data.detail || "Sprawdź dane"));
-        }
-    }
-    
-    window.onload = () => {
-        if(document.getElementById("partsContainer").children.length === 0) {
-            addPartBlock();
+        } catch (err) {
+            alert("Błąd połączenia z serwerem");
+            console.error(err);
         }
     };
 </script>

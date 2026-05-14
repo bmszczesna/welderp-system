@@ -156,18 +156,18 @@
 					if (part.steps && part.steps.length > 0) {
 						partsHtml += `<ul class="modal-steps-list" style="margin-top: 5px;">`;
 						part.steps.forEach(step => {
-							let stepOperatorHtml = step.operator
+							const stepOperatorHtml = step.operator
 								? `<span style="font-size: 11px; color: #4b5563; margin-left: 8px; font-style: italic;">(Odp: ${step.operator})</span>`
 								: '';
 
-							partsHtml += `<li style="margin-bottom: 3px;">${step.step_name} ${stepOperatorHtml}</li>`;
 							const pdfButton = step.pdf_path
-							   ? `<a href="/${step.pdf_path}" target="_blank" class="pdf-badge">PDF</a>`
-							   : "";
+								? `<a href="/${step.pdf_path}" target="_blank" class="pdf-badge" style="margin-left: 8px;">PDF</a>`
+								: "";
 
 							partsHtml += `
-								<li class="step-item">
+								<li class="step-item" style="display: flex; align-items: center; margin-bottom: 5px;">
 									<span class="step-text">${step.step_name}</span>
+									${stepOperatorHtml}
 									${pdfButton}
 								</li>`;
 						});

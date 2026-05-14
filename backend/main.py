@@ -14,7 +14,13 @@ from weasyprint import HTML
 import io
 import google.generativeai as genai
 
-genai.configure(api_key="AIzaSyCK2JK6FfJ-9GZZ0vL196k-spy2g2IXRFY")
+api_key = os.getenv("GEMINI_API_KEY")
+
+if not api_key:
+    print("BŁĄD: Brak klucza API Gemini w zmiennych środowiskowych!")
+else:
+    genai.configure(api_key=api_key)
+
 ai_model = genai.GenerativeModel('models/gemini-3-flash-preview')
 models.Base.metadata.create_all(bind=database.engine)
 

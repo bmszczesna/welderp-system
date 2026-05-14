@@ -39,6 +39,7 @@ class OrderPart(Base):
     id = Column(Integer, primary_key=True, index=True)
     part_name = Column(String, nullable=False)
     order_id = Column(Integer, ForeignKey("orders.id"))
+    operator = Column(String, nullable=True)
 
     owner = relationship("Order", back_populates="parts")
     steps = relationship("ProcessStep", back_populates="owner_part", cascade="all, delete-orphan")
@@ -49,6 +50,7 @@ class ProcessStep(Base):
     id = Column(Integer, primary_key=True, index=True)
     step_name = Column(String, nullable=False)
     status = Column(Enum(OrderStatus), default=OrderStatus.IN_QUEUE)
+    operator = Column(String, nullable=True)
 
     pdf_path = Column(String, nullable=True)
 

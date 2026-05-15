@@ -18,6 +18,10 @@
 					  Raport produkcyjny
 				</button>
 				<button class="btn btn-primary" type="button" id="newOrderBtn">Nowe zlecenie</button>
+                <button class="btn"
+                onclick="window.location.href='/archive.html'">
+                Archiwum
+                </button>
 			</div>
 		</header>
 
@@ -208,8 +212,16 @@
 				<div class="card-header">
 					<p class="order-number"><strong>${order.order_number}</strong></p>
 					<button class="info-btn" onclick="openModal(${order.id})" title="Szczegóły zlecenia">ℹ️</button>
+
 				</div>
                 <p class="order-deadline">${deadlineStr}</p>
+
+                 ${order.status === "COMPLETED" ? `
+                <button class="archive-btn-large"
+                    onclick="archiveOrder(${order.id})">
+                    Archiwizuj
+                </button>
+    ` : ""}
 			`;
 
 			card.addEventListener("dragstart", (event) => {
@@ -242,7 +254,9 @@
 		}
 
 		function renderBoard() {
-			const visibleOrders = orders.filter(matchesSearch);
+			const visibleOrders = orders
+            .filter(o => o.status !== "ARCHIVED")
+            .filter(matchesSearch);
 			const hasSearch = Boolean(searchQuery);
 
 			STATUSES.forEach((status) => {
@@ -369,6 +383,43 @@
 				showMessage("Nie udało się pobrać raportu AI", "error");
 			}
 		}
+
+        async function archiveOrder(orderId) {
+
+        const confirmed = confirm(
+            "Czy chcesz zarchiwizować zlecenie?"
+        );
+
+        if (!confirmed) return;
+
+        try {
+
+            const res = await fetch(
+                `/orders/${orderId}/status?status=ARCHIVED`,
+                {
+                    method: "PUT"
+                }
+            );
+
+            if (!res.ok) {
+                throw new Error();
+            }
+
+            showMessage(
+                "Zlecenie zarchiwizowano",
+                "success"
+            );
+
+            await loadOrders();
+
+        } catch {
+
+            showMessage(
+                "Błąd archiwizacji",
+                "error"
+            );
+        }
+    }
 	</script>
 </body>
 </html>

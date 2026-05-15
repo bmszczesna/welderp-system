@@ -85,7 +85,10 @@ class OrderResponse(BaseModel):
     order_number: str
     client_name: str
     status: OrderStatus
+
+    date_received: Optional[datetime] = None
     date_deadline: Optional[datetime] = None
+
     operator: Optional[str] = None
     parts: List[PartResponse]
 
@@ -107,6 +110,10 @@ def serve_kanban():
 @app.get("/kanban.html")
 def serve_kanban_html():
     return FileResponse("frontend/kanban.html")
+
+@app.get("/archive.html")
+def serve_archive_html():
+    return FileResponse("frontend/archive.html")
 
 
 @app.post("/orders/", status_code=201)
@@ -280,6 +287,7 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
     )
 
 
+
 @app.get("/reports/ai-pdf")
 def get_ai_report_pdf(db: Session = Depends(database.get_db)):
     # 1. Pobieranie danych z bazy
@@ -346,5 +354,482 @@ def get_ai_report_pdf(db: Session = Depends(database.get_db)):
         media_type="application/pdf",
         headers={
             "Content-Disposition": f"attachment; filename=raport_ai_{datetime.now().strftime('%d_%m_%Y')}.pdf"
+        }
+    )
+
+
+@app.get("/orders/{order_id}/ai-summary")
+def generate_order_ai_summary(
+        order_id: int,
+        db: Session = Depends(database.get_db)
+):
+    order = db.query(models.Order) \
+        .filter(models.Order.id == order_id) \
+        .first()
+
+    if not order:
+        raise HTTPException(
+            status_code=404,
+            detail="Order not found"
+        )
+
+    order_data = {
+        "numer": order.order_number,
+        "klient": order.client_name,
+        "operator": order.operator,
+        "status": order.status.value if order.status else "Brak",
+        "data_otrzymania": str(order.date_received),
+        "termin": str(order.date_deadline),
+        "czesci": []
+    }
+
+    for part in order.parts:
+        order_data["czesci"].append({
+
+            "nazwa": part.part_name,
+            "operator": part.operator,
+
+            "kroki": [
+                step.step_name
+                for step in part.steps
+            ]
+        })
+
+    prompt = f"""
+    Jesteś ekspertem produkcji WeldERP.
+
+    Przeanalizuj poniższe zlecenie:
+
+    {order_data}
+
+    Przygotuj profesjonalne podsumowanie:
+
+    1. Opis realizacji zlecenia.
+    2. Podsumowanie procesu produkcyjnego.
+    3. Możliwe ryzyka lub problemy.
+    4. Wnioski organizacyjne.
+    5. Krótką ocenę przebiegu produkcji.
+
+    Użyj HTML:
+    h2, h3, p, ul, li.
+    """
+
+    try:
+
+        ai_response = ai_model.generate_content(
+            prompt
+        )
+
+        ai_html = ai_response.text
+
+    except Exception as e:
+
+        ai_html = f"""
+        <p>
+            Błąd generowania AI:
+            {str(e)}
+        </p>
+        """
+
+    full_html = f"""
+    <html>
+
+        <head>
+
+            <meta charset="UTF-8">
+
+            <style>
+
+                @page {{
+                    size: A4;
+                    margin: 20mm;
+                }}
+
+                body {{
+                    font-family: DejaVu Sans, sans-serif;
+                    color: #1f2937;
+                    line-height: 1.6;
+                }}
+
+                h1 {{
+                    color: #8b5cf6;
+                    border-bottom: 2px solid #8b5cf6;
+                    padding-bottom: 10px;
+                }}
+
+                .box {{
+                    background: #f9fafb;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 8px;
+                    padding: 20px;
+                }}
+
+            </style>
+
+        </head>
+
+        <body>
+
+            <h1>
+                Podsumowanie AI
+            </h1>
+
+            <div class="box">
+
+                <h2>
+                    Zlecenie:
+                    {order.order_number}
+                </h2>
+
+                {ai_html}
+
+            </div>
+
+        </body>
+
+    </html>
+    """
+
+    pdf_bytes = HTML(
+        string=full_html
+    ).write_pdf()
+
+    return Response(
+
+        content=pdf_bytes,
+
+        media_type="application/pdf",
+
+        headers={
+            "Content-Disposition":
+                f"attachment; filename=ai_summary_{order.order_number}.pdf"
+        }
+    )
+
+@app.get("/reports/archive-ai-pdf")
+def get_archive_ai_report(
+
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        db: Session = Depends(database.get_db)
+):
+
+    query = db.query(models.Order).filter(
+        models.Order.status == OrderStatus.ARCHIVED
+    )
+
+    # FILTR DAT OD
+
+    if date_from:
+
+        query = query.filter(
+
+            models.Order.date_received >=
+            datetime.fromisoformat(date_from)
+        )
+
+    # FILTR DAT DO
+
+    if date_to:
+
+        end_date = datetime.fromisoformat(
+            date_to
+        ).replace(
+
+            hour=23,
+            minute=59,
+            second=59
+        )
+
+        query = query.filter(
+
+            models.Order.date_received <= end_date
+        )
+
+    orders = query.all()
+
+    # STATYSTYKI ERP
+
+    total_orders = len(orders)
+
+    operators = {}
+
+    all_parts = []
+
+    completed_on_time = 0
+
+    total_steps = 0
+
+    for o in orders:
+
+        # operatorzy
+
+        if o.operator:
+
+            operators[o.operator] = (
+
+                operators.get(o.operator, 0) + 1
+            )
+
+        # terminowość
+
+        if o.date_deadline and o.date_received:
+
+            if o.date_received <= o.date_deadline:
+
+                completed_on_time += 1
+
+        # części i kroki
+
+        for p in o.parts:
+
+            all_parts.append(p.part_name)
+
+            total_steps += len(p.steps)
+
+    # najaktywniejszy operator
+
+    most_common_operator = (
+
+        max(operators, key=operators.get)
+
+        if operators
+
+        else "Brak"
+    )
+
+    # procent terminowości
+
+    on_time_percent = 0
+
+    if total_orders > 0:
+
+        on_time_percent = round(
+
+            (completed_on_time / total_orders) * 100,
+            2
+        )
+
+    # średnia liczba kroków
+
+    avg_steps = 0
+
+    if total_orders > 0:
+
+        avg_steps = round(
+            total_steps / total_orders,
+            2
+        )
+
+    # dane dla AI
+
+    stats = {
+
+        "liczba_zlecen":
+            total_orders,
+
+        "operatorzy":
+            operators,
+
+        "najaktywniejszy_operator":
+            most_common_operator,
+
+        "liczba_czesci":
+            len(all_parts),
+
+        "najczestsze_czesci":
+            list(set(all_parts)),
+
+        "procent_terminowych":
+            on_time_percent,
+
+        "liczba_krokow_produkcyjnych":
+            total_steps,
+
+        "srednia_liczba_krokow":
+            avg_steps
+    }
+
+    # PROMPT AI
+
+    prompt = f"""
+    Jesteś analitykiem biznesowym systemu ERP
+    dla firmy produkcyjnej.
+
+    Przeanalizuj dane produkcyjne:
+
+    {stats}
+
+    Przygotuj profesjonalny raport zarządczy.
+
+    Raport ma zawierać:
+
+    1. Podsumowanie operacyjne.
+    2. Analizę wydajności operatorów.
+    3. Analizę terminowości produkcji.
+    4. KPI produkcyjne.
+    5. Możliwe ryzyka organizacyjne.
+    6. Wąskie gardła produkcyjne.
+    7. Rekomendacje optymalizacyjne.
+    8. Executive summary.
+
+    Wymagania:
+
+    - używaj procentów,
+    - używaj danych liczbowych,
+    - używaj języka biznesowego ERP,
+    - twórz profesjonalne wnioski,
+    - NIE wymyślaj danych,
+    - analizuj wyłącznie dostarczone statystyki.
+
+    Użyj HTML:
+    h1, h2, h3, p, ul, li, table.
+    """
+
+    try:
+
+        ai_response = ai_model.generate_content(
+            prompt
+        )
+
+        ai_html = ai_response.text
+
+    except Exception as e:
+
+        ai_html = f"""
+        <p>
+            Błąd AI:
+            {str(e)}
+        </p>
+        """
+
+    # HTML PDF
+
+    full_html = f"""
+    <html>
+
+        <head>
+
+            <meta charset="UTF-8">
+
+            <style>
+
+                @page {{
+                    size: A4;
+                    margin: 20mm;
+                }}
+
+                body {{
+                    font-family: DejaVu Sans, sans-serif;
+                    line-height: 1.6;
+                    color: #1f2937;
+                }}
+
+                h1 {{
+                    color: #8b5cf6;
+                    border-bottom: 2px solid #8b5cf6;
+                    padding-bottom: 10px;
+                }}
+
+                h2 {{
+                    color: #111827;
+                    margin-top: 25px;
+                }}
+
+                .box {{
+                    background: #f9fafb;
+                    border: 1px solid #e5e7eb;
+                    border-radius: 10px;
+                    padding: 24px;
+                }}
+
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin-top: 15px;
+                }}
+
+                th, td {{
+                    border: 1px solid #d1d5db;
+                    padding: 10px;
+                    text-align: left;
+                }}
+
+                th {{
+                    background: #ede9fe;
+                }}
+
+                .footer {{
+                    margin-top: 30px;
+                    font-size: 10px;
+                    color: #9ca3af;
+                    text-align: center;
+                }}
+
+            </style>
+
+        </head>
+
+        <body>
+
+            <h1>
+                Raport Archiwum WeldERP AI
+            </h1>
+
+            <div class="box">
+
+                <p>
+
+                    <strong>
+                        Zakres raportu:
+                    </strong>
+
+                    {date_from or "początek"}
+                    -
+                    {date_to or "koniec"}
+
+                </p>
+
+                <p>
+
+                    <strong>
+                        Liczba analizowanych zleceń:
+                    </strong>
+
+                    {total_orders}
+
+                </p>
+
+                {ai_html}
+
+            </div>
+
+            <div class="footer">
+
+                Wygenerowano automatycznie przez
+                WeldERP AI •
+                {datetime.now().strftime('%Y-%m-%d %H:%M')}
+
+            </div>
+
+        </body>
+
+    </html>
+    """
+
+    pdf_bytes = HTML(
+        string=full_html
+    ).write_pdf()
+
+    return Response(
+
+        content=pdf_bytes,
+
+        media_type="application/pdf",
+
+        headers={
+
+            "Content-Disposition":
+                "attachment; filename=archive_ai_report.pdf"
         }
     )

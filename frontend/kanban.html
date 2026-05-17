@@ -67,26 +67,82 @@
 		</section>
 	</main>
 
-	<div id="orderModal" class="modal-overlay">
-		<div class="modal-box">
+	<div id="orderModal" class="modal-overlay" style="display:none;">
+		<div class="modal-box" style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;">
 			<span class="modal-close" onclick="closeModal()">&times;</span>
 			
-			<div class="modal-header">
-				<h2 id="modalOrderNumber">Zlecenie: 000</h2>
-			</div>
-			
-			<div class="info-grid">
-				<div class="info-box"><span>Klient</span><strong id="modalClient">-</strong></div>
-				<div class="info-box"><span>Operator</span><strong id="modalOperator">-</strong></div>
-				<div class="info-box"><span>Data otrzymania</span><strong id="modalDateReceived">-</strong></div>
-				<div class="info-box"><span>Termin</span><strong id="modalDeadline" style="color: #ef4444;">-</strong></div>
-				<div class="info-box"><span>Status</span><strong id="modalStatus">-</strong></div>
+			<div id="modalViewContainer">
+				<div class="modal-header">
+					<h2 id="modalOrderNumber">Zlecenie: 000</h2>
+				</div>
+				
+				<div class="info-grid">
+					<div class="info-box"><span>Klient</span><strong id="modalClient">-</strong></div>
+					<div class="info-box"><span>Operator</span><strong id="modalOperator">-</strong></div>
+					<div class="info-box"><span>Data otrzymania</span><strong id="modalDateReceived">-</strong></div>
+					<div class="info-box"><span>Termin</span><strong id="modalDeadline" style="color: #ef4444;">-</strong></div>
+					<div class="info-box"><span>Status</span><strong id="modalStatus">-</strong></div>
+				</div>
+
+				<h3 class="modal-parts-title">Części:</h3>
+				<div id="modalPartsList" class="modal-parts-container"></div>
+
+				<div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+					<a id="btnDownloadPdf" href="#" class="btn" style="background: #3b82f6; color: white; text-decoration: none; display: flex; align-items: center; gap: 5px;">Pobierz kartę PDF</a>
+					<button class="btn" style="background: #fbbf24; color: #92400e; border-color: #fbbf24;" onclick="switchToEditMode()">Edytuj dane zlecenia</button>
+				</div>
 			</div>
 
-			<h3 class="modal-parts-title">Części:</h3>
-			<div id="modalPartsList" class="modal-parts-container"></div>
+			<div id="modalEditContainer" style="display: none;">
+				<div class="modal-header">
+					<h2 style="margin: 0; color: #1f2937;">Edycja Zlecenia</h2>
+				</div>
+				<form id="editOrderForm">
+					<div class="info-grid">
+						<div class="info-box" style="padding: 10px;">
+							<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">Numer Zlecenia</label>
+							<input type="text" id="editOrderNumber" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; margin-top: 4px;">
+						</div>
+						<div class="info-box" style="padding: 10px;">
+							<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">Nazwa Klienta</label>
+							<input type="text" id="editClient" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; margin-top: 4px;">
+						</div>
+						<div class="info-box" style="padding: 10px;">
+							<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">Operator Główny</label>
+							<select id="editOperator" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; margin-top: 4px; background: white;">
+								<option value="">Nie przypisano</option>
+								<option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
+								<option value="Tomasz Nowak">Tomasz Nowak</option>
+								<option value="Anna Wiśniewska">Anna Wiśniewska</option>
+							</select>
+						</div>
+						<div class="info-box" style="padding: 10px;">
+							<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">Termin (Deadline)</label>
+							<input type="datetime-local" id="editDeadline" style="width: 100%; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; margin-top: 4px;">
+						</div>
+					</div>
+
+					<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 15px;">
+						<h3 style="margin: 0; font-size: 16px;">Części i Kroki Technologiczne</h3>
+						<button type="button" class="btn" style="padding: 6px 12px; font-size: 13px;" onclick="addPartToEdit()">+ Dodaj część</button>
+					</div>
+					
+					<div id="editPartsContainer"></div>
+
+					<div style="text-align: right; border-top: 1px solid #e5e7eb; padding-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
+						<button type="button" class="btn" style="background: #f3f4f6; color: #4b5563;" onclick="openModal(currentOpenOrderId)">Anuluj</button>
+						<button type="button" class="btn btn-primary" onclick="saveOrderChanges()">Zapisz zmiany</button>
+					</div>
+				</form>
+			</div>
+			
 		</div>
 	</div>
+
+
+
+
+
 
 	<script>
 		const STATUSES = ["IN_QUEUE", "IN_PROGRESS", "QUALITY_CHECK", "COMPLETED"];
@@ -106,6 +162,7 @@
 		let orders = [];
 		let searchQuery = "";
 		let messageTimer = null;
+		let currentOpenOrderId = null;
 
 		function showMessage(text, type = "info") {
 			const el = document.getElementById("message");
@@ -122,6 +179,7 @@
 		}
 
 		function openModal(orderId) {
+			currentOpenOrderId = orderId;
 			const order = orders.find(o => o.id === orderId);
 			if (!order) return;
 
@@ -132,12 +190,8 @@
 				"COMPLETED": "var(--done)"
 			};
 
-			document.getElementById('modalOrderNumber').innerHTML = `
-				<span>Zlecenie: ${order.order_number}</span>
-				<a href="/orders/${order.id}/pdf" class="btn-download" title="Pobierz kartę zlecenia">
-					<span class="icon"></span> Karta PDF
-				</a>
-			`;
+			document.getElementById('modalOrderNumber').innerHTML = `<span>Zlecenie: ${order.order_number}</span>`;
+			document.getElementById('btnDownloadPdf').href = `/orders/${order.id}/pdf`;
 			document.getElementById('modalClient').textContent = order.client_name;
 			document.getElementById('modalOperator').textContent = order.operator || "Nie przypisano";
 			document.getElementById('modalDateReceived').textContent = order.date_received ? order.date_received.slice(0, 10) : "2026-05-18"; 
@@ -184,9 +238,183 @@
 				partsHtml = "<p style='color: #6b7280; font-style: italic;'>Brak szczegółowych części w tym zleceniu.</p>";
 			}
 			document.getElementById('modalPartsList').innerHTML = partsHtml;
+			document.getElementById('modalViewContainer').style.display = 'block';
+    		document.getElementById('modalEditContainer').style.display = 'none';
 
 			document.getElementById('orderModal').style.display = "block";
 		}
+
+		function switchToEditMode() {
+    		const order = orders.find(o => o.id === currentOpenOrderId);
+    		if (!order) return;
+
+    		document.getElementById('modalViewContainer').style.display = 'none';
+    		document.getElementById('modalEditContainer').style.display = 'block';
+
+    		document.getElementById('editOrderNumber').value = order.order_number;
+    		document.getElementById('editClient').value = order.client_name;
+    		document.getElementById('editOperator').value = order.operator || "";
+    
+    		document.getElementById('editDeadline').value = order.date_deadline ? order.date_deadline.slice(0, 16) : "";
+    
+    		const partsContainer = document.getElementById('editPartsContainer');
+    		partsContainer.innerHTML = "";
+    
+    		if (order.parts && order.parts.length > 0) {
+        		order.parts.forEach(part => {
+            	addPartToEdit(part);
+        		});
+    		}
+		}
+
+		function addPartToEdit(part = {}) {
+		const container = document.getElementById('editPartsContainer');
+		const partEl = document.createElement('div');
+		partEl.className = 'edit-part-item';
+		partEl.style.border = '1px solid #e5e7eb';
+		partEl.style.padding = '10px';
+		partEl.style.marginBottom = '10px';
+		partEl.style.borderRadius = '6px';
+
+		partEl.innerHTML = `
+			<div style="display: flex; gap: 10px; margin-bottom: 10px;">
+				<input type="text" class="edit-part-name" placeholder="Nazwa części" value="${part.part_name || ''}" style="flex: 2; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px;">
+				<select class="edit-part-operator" style="flex: 1; padding: 6px; border: 1px solid #d1d5db; border-radius: 4px; background: white;">
+					<option value="">-- Operator z zamówienia --</option>
+					<option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
+					<option value="Tomasz Nowak">Tomasz Nowak</option>
+					<option value="Anna Wiśniewska">Anna Wiśniewska</option>
+				</select>
+				<button type="button" class="remove-part-btn" title="Usuń część" style="color: red; border: none; background: none; font-weight: bold; cursor: pointer;">X</button>
+			</div>
+			
+			<div class="edit-steps-container" style="margin-left: 20px; border-left: 2px solid #cbd5e1; padding-left: 10px;"></div>
+			
+			<button type="button" class="add-step-btn" style="margin-left: 20px; font-size: 12px; padding: 4px; cursor: pointer;">+ Dodaj krok</button>
+		`;
+
+		partEl.querySelector('.edit-part-operator').value = part.operator || "";
+
+		partEl.querySelector('.remove-part-btn').addEventListener('click', () => {
+			container.removeChild(partEl);
+		});
+
+		const stepsContainer = partEl.querySelector('.edit-steps-container');
+
+		partEl.querySelector('.add-step-btn').addEventListener('click', () => {
+			addStepToEditUI(stepsContainer, {}); 
+		});
+
+		if (part.steps && part.steps.length > 0) {
+			part.steps.forEach(step => {
+				addStepToEditUI(stepsContainer, step);
+			});
+		}
+		container.appendChild(partEl);
+	}
+
+	function addStepToEditUI(container, step = {}) {
+		const stepEl = document.createElement('div');
+		stepEl.className = 'edit-step-item';
+		stepEl.style.display = 'flex';
+		stepEl.style.gap = '5px';
+		stepEl.style.marginBottom = '5px';
+
+		stepEl.innerHTML = `
+			<input type="text" class="edit-step-name" placeholder="Nazwa kroku" value="${step.step_name || ''}" style="flex: 2; padding: 5px; border: 1px solid #d1d5db; border-radius: 4px;">
+			<select class="edit-step-operator" style="flex: 1; padding: 5px; border: 1px solid #d1d5db; border-radius: 4px; background: white;">
+				<option value="">-- Operator z części --</option>
+				<option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
+				<option value="Tomasz Nowak">Tomasz Nowak</option>
+				<option value="Anna Wiśniewska">Anna Wiśniewska</option>
+			</select>
+			<button type="button" class="remove-step-btn" title="Usuń krok" style="color: red; border: none; background: none; cursor: pointer;">X</button>
+		`;
+
+		stepEl.querySelector('.edit-step-operator').value = step.operator || "";
+
+		stepEl.querySelector('.remove-step-btn').addEventListener('click', () => {
+			container.removeChild(stepEl);
+		});
+
+		container.appendChild(stepEl);
+	}
+
+	async function saveOrderChanges() {
+		const orderId = currentOpenOrderId;
+		if (!orderId) return;
+
+		const orderNum = document.getElementById('editOrderNumber').value.trim();
+		const clientName = document.getElementById('editClient').value.trim();
+		const deadline = document.getElementById('editDeadline').value;
+		const operator = document.getElementById('editOperator').value;
+
+		if (!orderNum || !clientName || !deadline) {
+			alert("Błąd: Wypełnij Numer zlecenia, Nazwę klienta oraz Termin!");
+			return;
+		}
+
+		const payload = {
+			order_number: orderNum,
+			client_name: clientName,
+			operator: operator || null,
+			date_deadline: deadline + ":00",
+			parts: []
+		};
+
+		let hasError = false;
+		let partCount = 0;
+
+		document.querySelectorAll('.edit-part-item').forEach(pBlock => {
+			const partName = pBlock.querySelector('.edit-part-name').value.trim();
+			if (!partName) { hasError = true; return; }
+			partCount++;
+
+			const part = {
+				part_name: partName,
+				operator: pBlock.querySelector('.edit-part-operator').value || null,
+				steps: []
+			};
+			
+			pBlock.querySelectorAll('.edit-step-item').forEach(sRow => {
+				const stepName = sRow.querySelector('.edit-step-name').value.trim();
+				if (!stepName) { hasError = true; return; }
+
+				part.steps.push({
+					step_name: stepName,
+					operator: sRow.querySelector('.edit-step-operator').value || null
+				});
+			});
+			
+			payload.parts.push(part);
+		});
+
+		// Jeśli gdzieś była pusta nazwa 
+		if (partCount === 0 || hasError) {
+			alert("Błąd: Zlecenie musi mieć poprawne nazwy części i kroków (nie mogą być puste)!");
+			return;
+		}
+
+		try {
+			const res = await fetch(`/orders/${orderId}`, {
+				method: "PUT",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify(payload)
+			});
+
+			if (res.ok) {
+				showMessage("Zlecenie zaktualizowane!", "success");
+				closeModal();
+				loadOrders(); 
+			} else {
+				const data = await res.json();
+				showMessage("Błąd zapisu: " + (data.detail || "Sprawdź dane"), "error");
+			}
+		} catch (err) {
+			console.error(err);
+			showMessage("Błąd połączenia z serwerem", "error");
+		}
+	}
 
 		function closeModal() {
 			document.getElementById('orderModal').style.display = "none";

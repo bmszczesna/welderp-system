@@ -95,6 +95,24 @@ class OrderResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+
+class StepUpdate(BaseModel):
+    step_name: str
+    operator: Optional[str] = None
+
+class PartUpdate(BaseModel):
+    part_name: str
+    operator: Optional[str] = None
+    steps: List[StepCreate] = []
+
+class OrderUpdate(BaseModel):
+    order_number: str
+    client_name: str
+    date_deadline: Optional[datetime] = None
+    operator: Optional[str] = None
+    parts: List[PartUpdate] = []
+
 # --- API Endpoints ---
 
 @app.get("/index.html")
@@ -225,6 +243,34 @@ def assign_operator(order_id: int, operator_name: str, db: Session = Depends(dat
     order.operator = operator_name if operator_name != "Brak" else None
     db.commit()
     return {"message": "Operator przypisany"}
+
+@app.put("/orders/{order_id}")
+def update_order(order_id: int, order_update: OrderUpdate, db: Session = Depends(database.get_db)):
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    order.order_number = order_update.order_number
+    order.client_name = order_update.client_name
+    order.date_deadline = order_update.date_deadline
+    order.operator = order_update.operator
+
+    for part in order.parts:
+        db.delete(part)
+    db.commit()
+
+    for part in order_update.parts:
+        new_part = models.OrderPart(part_name=part.part_name, order_id=order.id, operator=part.operator)
+        db.add(new_part)
+        db.flush()
+
+        for step in part.steps:
+            new_step = models.ProcessStep(step_name=step.step_name, part_id=new_part.id, operator=step.operator)
+            db.add(new_step)
+    
+    db.commit()
+    db.refresh(order)
+    return {"message": "Order updated successfully"}
 
 
 @app.post("/steps/{step_id}/upload-pdf")
@@ -833,3 +879,4 @@ def get_archive_ai_report(
                 "attachment; filename=archive_ai_report.pdf"
         }
     )
+

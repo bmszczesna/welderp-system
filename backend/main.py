@@ -949,9 +949,9 @@ def delete_operator(op_id: int, db: Session = Depends(database.get_db)):
     return {"message": "Operator usunięty"}
 
 @app.post("/register/")
-def register_user(username: str, password: str, db: Session = Depends(database.get_db)):
+def register_user(username: str, password: str, full_name: str, db: Session = Depends(database.get_db)):
     hashed_pw = models.pwd_context.hash(password)
-    user = models.User(username=username, hashed_password=hashed_pw)
+    user = models.User(username=username, hashed_password=hashed_pw, full_name=full_name)
     db.add(user)
     db.commit()
     return {"message": "Użytkownik zarejestrowany"}

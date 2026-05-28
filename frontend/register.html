@@ -54,24 +54,26 @@
     <div class="box">
         <h3>Rejestracja WeldERP</h3>
         <input type="text" id="username" placeholder="Nowy login">
+        <input type="text" id="full_name" placeholder="Imię i nazwisko">
         <input type="password" id="password" placeholder="Hasło">
         <button onclick="register()">Zarejestruj się</button>
-        <div class="footer-link">Masz już konto?<a href="/frontend/login.html"> Zaloguj się</a></div>
     </div>
 
     <script>
         async function register() {
             const u = document.getElementById('username').value;
+            const fn = document.getElementById('full_name').value;
             const p = document.getElementById('password').value;
 
-            const res = await fetch(`/register/?username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}`, { method: 'POST' });
+            const res = await fetch(`/register/?username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}&full_name=${encodeURIComponent(fn)}`, {
+                method: 'POST'
+            });
 
             if(res.ok) {
-                alert("Zarejestrowano! Możesz się zalogować.");
+                alert("Zarejestrowano!");
                 window.location.href = "/frontend/login.html";
             } else {
-                const err = await res.json();
-                alert(err.detail || "Błąd rejestracji");
+                alert("Błąd rejestracji");
             }
         }
     </script>

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from backend.database import Base
 import datetime
@@ -27,6 +27,7 @@ class Order(Base):
 
     # Status
     status = Column(Enum(OrderStatus), default=OrderStatus.IN_QUEUE)
+    is_approved = Column(Boolean, default=False)
 
     operator = Column(String, nullable=True)
 

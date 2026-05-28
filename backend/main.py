@@ -85,6 +85,7 @@ class OrderResponse(BaseModel):
     order_number: str
     client_name: str
     status: OrderStatus
+    is_approved: bool = False
 
     date_received: Optional[datetime] = None
     date_deadline: Optional[datetime] = None
@@ -180,6 +181,7 @@ def get_orders(db: Session = Depends(database.get_db)):
             "date_received": o.date_received,
             "date_deadline": o.date_deadline,
             "status": o.status.value if o.status else None,
+            "is_approved": o.is_approved,
             "operator": o.operator,
             "parts": [
                 {
@@ -243,6 +245,16 @@ def assign_operator(order_id: int, operator_name: str, db: Session = Depends(dat
     order.operator = operator_name if operator_name != "Brak" else None
     db.commit()
     return {"message": "Operator przypisany"}
+
+@app.put("/orders/{order_id}/approve")
+def approve_order(order_id: int, db: Session = Depends(database.get_db)):
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Nie znaleziono zlecenia")
+    
+    order.is_approved = True
+    db.commit()
+    return {"message": "Zlecenie zatwierdzone"}
 
 @app.put("/orders/{order_id}")
 def update_order(order_id: int, order_update: OrderUpdate, db: Session = Depends(database.get_db)):

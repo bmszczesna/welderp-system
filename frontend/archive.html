@@ -37,72 +37,48 @@
 
     <div style="
     background: white;
-    padding: 18px;
+    padding: 20px;
     border-radius: 12px;
     border: 1px solid #e5e7eb;
     margin-bottom: 25px;
-
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
     display: flex;
-    gap: 15px;
-    align-items: end;
+    gap: 20px;
+    align-items: flex-end;
     flex-wrap: wrap;
 ">
 
-    <div>
-
-        <label style="
-            display: block;
-            font-size: 13px;
-            margin-bottom: 6px;
-            color: #6b7280;
-        ">
-
+    <div style="flex: 1; min-width: 150px;">
+        <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #4b5563; text-transform: uppercase;">
             Data od
-
         </label>
-
-        <input
-            type="date"
-            id="dateFrom"
-            class="input"
-        >
-
+        <input type="date" id="dateFrom" class="search" style="width: 100%; box-sizing: border-box; background-color: #f9fafb;">
     </div>
 
-    <div>
-
-        <label style="
-            display: block;
-            font-size: 13px;
-            margin-bottom: 6px;
-            color: #6b7280;
-        ">
-
+    <div style="flex: 1; min-width: 150px;">
+        <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #4b5563; text-transform: uppercase;">
             Data do
-
         </label>
-
-        <input
-            type="date"
-            id="dateTo"
-            class="input"
-        >
-
+        <input type="date" id="dateTo" class="search" style="width: 100%; box-sizing: border-box; background-color: #f9fafb;">
     </div>
 
     <button
         class="btn"
         onclick="generateArchiveAIReport(event)"
         style="
-            border-color: #8b5cf6;
-            color: #8b5cf6;
+            border: 2px solid #8b5cf6;
+            color: white;
+            background: #8b5cf6;
+            font-weight: bold;
+            padding: 10px 20px;
+            border-radius: 8px;
+            transition: all 0.2s ease;
         "
+        onmouseover="this.style.background='#7c3aed'; this.style.borderColor='#7c3aed';"
+        onmouseout="this.style.background='#8b5cf6'; this.style.borderColor='#8b5cf6';"
     >
-
-        Generuj raport AI
-
+        ✨ Generuj raport AI
     </button>
-
     </div>
 
     <div id="archiveContainer"

@@ -4,6 +4,15 @@ from backend.database import Base
 import datetime
 from sqlalchemy import Enum
 import enum
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
 
 class OrderStatus(enum.Enum):
     IN_QUEUE = "IN_QUEUE"
@@ -43,6 +52,8 @@ class OrderPart(Base):
     order_id = Column(Integer, ForeignKey("orders.id"))
     operator = Column(String, nullable=True)
 
+    pdfs = relationship("PartPDF", back_populates="part", cascade="all, delete-orphan")
+
     owner = relationship("Order", back_populates="parts")
     steps = relationship("ProcessStep", back_populates="owner_part", cascade="all, delete-orphan")
 
@@ -54,7 +65,20 @@ class ProcessStep(Base):
     status = Column(Enum(OrderStatus), default=OrderStatus.IN_QUEUE)
     operator = Column(String, nullable=True)
 
-    pdf_path = Column(String, nullable=True)
-
     part_id = Column(Integer, ForeignKey("order_parts.id"))
     owner_part = relationship("OrderPart", back_populates="steps")
+    is_completed = Column(Boolean, default=False)
+
+
+class PartPDF(Base):
+    __tablename__ = "part_pdfs"
+    id = Column(Integer, primary_key=True, index=True)
+    file_name = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
+    part_id = Column(Integer, ForeignKey("order_parts.id"))
+    part = relationship("OrderPart", back_populates="pdfs")
+
+class Operator(Base):
+    __tablename__ = "operators"
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, unique=True, nullable=False)

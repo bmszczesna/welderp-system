@@ -75,7 +75,7 @@
         partDiv.className = "part-block";
         partDiv.innerHTML = `
             <div style="display: flex; gap: 10px; margin-bottom: 10px;">
-                <input type="text" class="part-name" placeholder="Nazwa części (np. Rama Główna)" style="flex-grow: 1; font-weight: bold; margin: 0;">
+                <input type="text" class="part-name" placeholder="Nazwa części" style="flex-grow: 1; font-weight: bold; margin: 0;">
                 <select class="part-operator" style="width: auto; margin: 0; padding: 5px; font-size: 13px;">
                     <option value="">-- Operator z zamówienia --</option>
                     <option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
@@ -83,9 +83,15 @@
                     <option value="Anna Wiśniewska">Anna Wiśniewska</option>
                 </select>
             </div>
+            <div style="margin-bottom: 10px;">
+                <label style="font-size: 11px; color: #6b7280;">Załączniki PDF dla części:</label>
+                <input type="file" class="part-pdf-input" multiple accept=".pdf" style="display: none;" onchange="handleFileSelection(this)">
+                <button type="button" class="btn-small" onclick="this.previousElementSibling.click()">Wybierz pliki</button>
+                <div class="files-preview-list" style="margin-top: 5px; font-size: 12px;"></div>
+            </div>
             <div class="stepsContainer"></div>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
-                <button type="button" class="btn-small" onclick="addStepBlock(this)">+ Dodaj krok (np. Spawanie)</button>
+                <button type="button" class="btn-small" onclick="addStepBlock(this)">+ Dodaj krok</button>
                 <button type="button" class="btn-small btn-remove" onclick="this.parentElement.parentElement.remove()">Usuń część</button>
             </div>
         `;
@@ -98,7 +104,6 @@
         stepDiv.className = "step-input-group";
         stepDiv.innerHTML = `
             <input type="text" class="step-name" placeholder="Opis kroku (np. Cięcie plazmą)">
-            <input type="file" class="step-pdf" accept=".pdf" style="width: auto; font-size: 11px;">
             <select class="step-operator" style="width: auto; margin: 0; padding: 5px; font-size: 13px;">
                 <option value="">-- Operator z części --</option>
                 <option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
@@ -131,42 +136,25 @@
             parts: []
         };
 
-        let hasError = false;
-        let partCount = 0;
-
         document.querySelectorAll(".part-block").forEach(partBlock => {
             const partName = partBlock.querySelector(".part-name").value.trim();
-            if (!partName) { hasError = true; return; }
-            partCount++;
+            if (!partName) return;
 
-            const partOperatorSelect = partBlock.querySelector(".part-operator").value;
-            const resolvedPartOperator = partOperatorSelect ? partOperatorSelect : payload.operator;
+            const partOperator = partBlock.querySelector(".part-operator").value || payload.operator;
 
             const steps = [];
             partBlock.querySelectorAll(".step-input-group").forEach(stepGroup => {
                 const stepName = stepGroup.querySelector(".step-name").value.trim();
-                const stepOperatorSelect = stepGroup.querySelector(".step-operator").value;
-                const resolvedStepOperator = stepOperatorSelect ? stepOperatorSelect : resolvedPartOperator;
-
-                if(stepName) {
+                if (stepName) {
                     steps.push({
                         step_name: stepName,
-                        operator: resolvedStepOperator
+                        operator: stepGroup.querySelector(".step-operator").value || partOperator
                     });
                 }
             });
 
-            payload.parts.push({
-                part_name: partName,
-                steps: steps,
-                operator: resolvedPartOperator
-            });
+            payload.parts.push({ part_name: partName, steps: steps, operator: partOperator });
         });
-
-        if (partCount === 0 || hasError) {
-            alert("Błąd: Zlecenie musi mieć poprawne części!");
-            return;
-        }
 
         try {
             const res = await fetch("/orders/", {
@@ -175,43 +163,90 @@
                 body: JSON.stringify(payload)
             });
 
-            if (res.ok) {
-                const data = await res.json();
-                const orderId = data.order_id;
+            if (!res.ok) throw new Error("Błąd tworzenia zlecenia");
 
-                // Pobieramy nowo utworzone zlecenie, aby mieć poprawne ID kroków do wysyłki PDF
-                const orderRes = await fetch(`/orders/${orderId}`);
-                const orderData = await orderRes.json();
+            const data = await res.json();
+            const orderId = data.order_id;
 
-                const partBlocks = document.querySelectorAll(".part-block");
-                for (let pIdx = 0; pIdx < partBlocks.length; pIdx++) {
-                    const stepInputs = partBlocks[pIdx].querySelectorAll(".step-input-group");
-                    for (let sIdx = 0; sIdx < stepInputs.length; sIdx++) {
-                        const fileInput = stepInputs[sIdx].querySelector(".step-pdf");
-                        if (fileInput && fileInput.files.length > 0) {
-                            const stepObj = orderData.parts[pIdx].steps[sIdx];
-                            if (stepObj && stepObj.id) {
-                                const formData = new FormData();
-                                formData.append("file", fileInput.files[0]);
-                                await fetch(`/steps/${stepObj.id}/upload-pdf`, {
-                                    method: "POST",
-                                    body: formData
-                                });
-                            }
-                        }
+            const orderRes = await fetch(`/orders/${orderId}`);
+            const orderData = await orderRes.json();
+
+            const partMap = {};
+            orderData.parts.forEach(p => partMap[p.part_name] = p.id);
+
+            const partBlocks = document.querySelectorAll(".part-block");
+            for (let partBlock of partBlocks) {
+                const partName = partBlock.querySelector(".part-name").value.trim();
+                const partId = partMap[partName];
+
+                const filesToUpload = partFilesMap.get(partBlock) || [];
+                if (filesToUpload.length > 0 && partId) {
+                    for (const fileObj of filesToUpload) {
+                        const formData = new FormData();
+                        formData.append("file", fileObj.file);
+
+                        await fetch(`/parts/${partId}/upload-pdf`, {
+                            method: "POST",
+                            body: formData
+                        });
                     }
                 }
-                alert("Zlecenie utworzone pomyślnie!");
-                window.location.href = "/kanban.html";
-            } else {
-                const data = await res.json();
-                alert("Błąd API: " + (data.detail || "Sprawdź dane"));
             }
+
+            alert("Zlecenie utworzone pomyślnie!");
+            window.location.href = "/kanban.html";
         } catch (err) {
-            alert("Błąd połączenia z serwerem");
+            alert("Wystąpił błąd podczas tworzenia zlecenia lub przesyłania plików.");
             console.error(err);
         }
     };
+
+    const partFilesMap = new Map();
+
+    function handleFileSelection(input) {
+        const previewList = input.parentElement.querySelector(".files-preview-list");
+        const partId = input.closest(".part-block");
+
+        const files = Array.from(input.files);
+
+        files.forEach(file => {
+            const fileId = Math.random().toString(36).substr(2, 9);
+            const fileDiv = document.createElement("div");
+            fileDiv.dataset.fileId = fileId;
+            fileDiv.style = "display: flex; justify-content: space-between; background: #eee; padding: 2px 5px; margin-bottom: 2px; border-radius: 4px;";
+            fileDiv.innerHTML = `
+                <span>${file.name}</span>
+                <button type="button" style="color:red; background:none; border:none; cursor:pointer;" onclick="removeFile(this, '${fileId}')">x</button>
+            `;
+            previewList.appendChild(fileDiv);
+
+            if (!partFilesMap.has(partId)) partFilesMap.set(partId, []);
+            partFilesMap.get(partId).push({ id: fileId, file: file });
+        });
+
+        input.value = "";
+    }
+
+    function removeFile(btn, fileId) {
+        const partId = btn.closest(".part-block");
+        const list = partFilesMap.get(partId);
+        partFilesMap.set(partId, list.filter(f => f.id !== fileId));
+        btn.parentElement.remove();
+    }
+
+    async function loadOperatorsToDropdowns() {
+        const res = await fetch('/operators/');
+        const ops = await res.json();
+        const selects = document.querySelectorAll('select#operator, select.part-operator, select.step-operator');
+
+        selects.forEach(select => {
+            const defaultOption = select.querySelector('option[value=""]') ? `<option value="">${select.querySelector('option[value=""]').text}</option>` : '';
+            select.innerHTML = defaultOption + ops.map(op =>
+                `<option value="${op.name}">${op.name}</option>`
+            ).join('');
+        });
+    }
+    window.addEventListener('DOMContentLoaded', loadOperatorsToDropdowns);
 </script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response, Request
 from sqlalchemy.orm import Session
 import shutil
 import os
@@ -123,11 +123,13 @@ def serve_index_html():
 
 @app.get("/")
 def serve_kanban():
-    return FileResponse("frontend/kanban.html")
+    return FileResponse("frontend/login.html")
 
 
 @app.get("/kanban.html")
-def serve_kanban_html():
+def serve_kanban_html(request: Request):
+    if "logged_in" not in request.cookies:
+        return RedirectResponse(url="/frontend/login.html")
     return FileResponse("frontend/kanban.html")
 
 @app.get("/archive.html")
@@ -188,7 +190,8 @@ def get_orders(db: Session = Depends(database.get_db)):
                     "id": p.id,
                     "part_name": p.part_name,
                     "operator": p.operator,
-                    "steps": [ { "id": s.id, "step_name": s.step_name, "operator": s.operator, "pdf_path": s.pdf_path} for s in p.steps]
+                    "steps": [ { "id": s.id, "step_name": s.step_name, "operator": s.operator} for s in p.steps],
+                    "pdfs": [{"id": pdf.id, "file_name": pdf.file_name} for pdf in p.pdfs]
                 }
                 for p in o.parts
             ]
@@ -285,22 +288,32 @@ def update_order(order_id: int, order_update: OrderUpdate, db: Session = Depends
     return {"message": "Order updated successfully"}
 
 
-@app.post("/steps/{step_id}/upload-pdf")
-async def upload_step_pdf(step_id: int, file: UploadFile = File(...), db: Session = Depends(database.get_db)):
-    step = db.query(models.ProcessStep).filter(models.ProcessStep.id == step_id).first()
-    if not step:
-        raise HTTPException(status_code=404, detail="Krok nie istnieje")
-
-    if not file.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Tylko pliki PDF są dozwolone")
-
-    file_path = os.path.join(UPLOAD_DIR, f"step_{step_id}_{file.filename}")
+@app.post("/parts/{part_id}/upload-pdf")
+async def upload_part_pdf(part_id: int, file: UploadFile = File(...), db: Session = Depends(database.get_db)):
+    full_filename = f"{part_id}_{file.filename}"
+    file_path = os.path.join(UPLOAD_DIR, full_filename)
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    step.pdf_path = file_path
+    new_pdf = models.PartPDF(part_id=part_id, file_path=file_path, file_name=full_filename)
+    db.add(new_pdf)
     db.commit()
-    return {"pdf_path": file_path}
+    db.refresh(new_pdf)
+    return {"message": "Plik dodany", "id": new_pdf.id}
+
+
+@app.delete("/parts/pdf/{pdf_id}")
+async def delete_part_pdf(pdf_id: int, db: Session = Depends(database.get_db)):
+    pdf = db.query(models.PartPDF).filter(models.PartPDF.id == pdf_id).first()
+    if not pdf:
+        raise HTTPException(status_code=404, detail="Plik nie znaleziony")
+
+    if os.path.exists(pdf.file_path):
+        os.remove(pdf.file_path)
+
+    db.delete(pdf)
+    db.commit()
+    return {"message": "Plik usunięty"}
 
 
 @app.get("/orders/{order_id}/pdf")
@@ -892,3 +905,83 @@ def get_archive_ai_report(
         }
     )
 
+
+@app.put("/steps/{step_id}/toggle")
+def toggle_step_status(step_id: int, db: Session = Depends(database.get_db)):
+    step = db.query(models.ProcessStep).filter(models.ProcessStep.id == step_id).first()
+    if not step:
+        raise HTTPException(status_code=404, detail="Krok nie istnieje")
+
+    step.is_completed = not step.is_completed
+    db.commit()
+    return {"is_completed": step.is_completed}
+
+@app.get("/operators/")
+def get_operators(db: Session = Depends(database.get_db)):
+    return db.query(models.Operator).all()
+
+@app.post("/operators/")
+def add_operator(name: str, db: Session = Depends(database.get_db)):
+    new_op = models.Operator(name=name)
+    db.add(new_op)
+    db.commit()
+    return new_op
+
+@app.delete("/operators/{op_id}")
+def delete_operator(op_id: int, db: Session = Depends(database.get_db)):
+    op = db.query(models.Operator).filter(models.Operator.id == op_id).first()
+    if not op:
+        raise HTTPException(status_code=404, detail="Operator nie istnieje")
+
+    assigned_orders = db.query(models.Order).filter(
+        models.Order.operator == op.name,
+        models.Order.status.notin_([OrderStatus.COMPLETED, OrderStatus.ARCHIVED])
+    ).first()
+
+    if assigned_orders:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Nie można usunąć operatora {op.name}, ponieważ jest przypisany do trwających zleceń."
+        )
+
+    db.delete(op)
+    db.commit()
+    return {"message": "Operator usunięty"}
+
+@app.post("/register/")
+def register_user(username: str, password: str, db: Session = Depends(database.get_db)):
+    hashed_pw = models.pwd_context.hash(password)
+    user = models.User(username=username, hashed_password=hashed_pw)
+    db.add(user)
+    db.commit()
+    return {"message": "Użytkownik zarejestrowany"}
+
+
+@app.post("/login/")
+def login_user(username: str, password: str, response: Response, db: Session = Depends(database.get_db)):
+    user = db.query(models.User).filter(models.User.username == username).first()
+    if not user or not models.pwd_context.verify(password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Nieprawidłowy login lub hasło")
+
+    response.set_cookie(key="logged_in", value="true", httponly=True)
+    return {"message": "Zalogowano pomyślnie"}
+
+
+@app.post("/logout/")
+def logout(response: Response):
+    response.delete_cookie("logged_in")
+    return {"message": "Wylogowano"}
+
+
+# Sprawdź, czy masz to w main.py:
+@app.post("/register/")
+def register_user(username: str, password: str, db: Session = Depends(database.get_db)):
+    existing_user = db.query(models.User).filter(models.User.username == username).first()
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Użytkownik już istnieje")
+
+    hashed_pw = models.pwd_context.hash(password)
+    user = models.User(username=username, hashed_password=hashed_pw)
+    db.add(user)
+    db.commit()
+    return {"message": "Użytkownik zarejestrowany"}

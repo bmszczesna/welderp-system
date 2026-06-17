@@ -53,9 +53,6 @@
         <label>Przypisz Operatora</label>
         <select id="operator">
             <option value="Brak">Nie wybrano</option>
-            <option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
-            <option value="Tomasz Nowak">Tomasz Nowak</option>
-            <option value="Anna Wiśniewska">Anna Wiśniewska</option>
         </select>
 
         <button class="btn-success" onclick="submitOrder()">Utwórz Zlecenie</button>
@@ -69,6 +66,14 @@
 </div>
 
 <script>
+    let availableOperators = [];
+
+    function operatorOptionsHtml() {
+        return availableOperators.map(op =>
+            `<option value="${op.name}">${op.name}</option>`
+        ).join('');
+    }
+
     function addPartBlock() {
         const container = document.getElementById("partsContainer");
         const partDiv = document.createElement("div");
@@ -78,11 +83,10 @@
                 <input type="text" class="part-name" placeholder="Nazwa części" style="flex-grow: 1; font-weight: bold; margin: 0;">
                 <select class="part-operator" style="width: auto; margin: 0; padding: 5px; font-size: 13px;">
                     <option value="">-- Operator z zamówienia --</option>
-                    <option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
-                    <option value="Tomasz Nowak">Tomasz Nowak</option>
-                    <option value="Anna Wiśniewska">Anna Wiśniewska</option>
+                    ${operatorOptionsHtml()}
                 </select>
             </div>
+            <input type="text" class="part-material" placeholder="Materiał (np. S235, aluminium, profil 40x40)" style="margin-top: 0;">
             <div style="margin-bottom: 10px;">
                 <label style="font-size: 11px; color: #6b7280;">Załączniki PDF dla części:</label>
                 <input type="file" class="part-pdf-input" multiple accept=".pdf" style="display: none;" onchange="handleFileSelection(this)">
@@ -106,9 +110,7 @@
             <input type="text" class="step-name" placeholder="Opis kroku (np. Cięcie plazmą)">
             <select class="step-operator" style="width: auto; margin: 0; padding: 5px; font-size: 13px;">
                 <option value="">-- Operator z części --</option>
-                <option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
-                <option value="Tomasz Nowak">Tomasz Nowak</option>
-                <option value="Anna Wiśniewska">Anna Wiśniewska</option>
+                ${operatorOptionsHtml()}
             </select>
             <button type="button" class="btn-small btn-remove" onclick="this.parentElement.remove()">X</button>
         `;
@@ -141,6 +143,7 @@
             if (!partName) return;
 
             const partOperator = partBlock.querySelector(".part-operator").value || payload.operator;
+            const partMaterial = partBlock.querySelector(".part-material").value.trim();
 
             const steps = [];
             partBlock.querySelectorAll(".step-input-group").forEach(stepGroup => {
@@ -153,7 +156,7 @@
                 }
             });
 
-            payload.parts.push({ part_name: partName, steps: steps, operator: partOperator });
+            payload.parts.push({ part_name: partName, material: partMaterial || null, steps: steps, operator: partOperator });
         });
 
         try {
@@ -236,14 +239,13 @@
 
     async function loadOperatorsToDropdowns() {
         const res = await fetch('/operators/');
-        const ops = await res.json();
+        availableOperators = await res.json();
         const selects = document.querySelectorAll('select#operator, select.part-operator, select.step-operator');
 
         selects.forEach(select => {
-            const defaultOption = select.querySelector('option[value=""]') ? `<option value="">${select.querySelector('option[value=""]').text}</option>` : '';
-            select.innerHTML = defaultOption + ops.map(op =>
-                `<option value="${op.name}">${op.name}</option>`
-            ).join('');
+            const firstOption = select.options[0];
+            const defaultOption = firstOption ? `<option value="${firstOption.value}">${firstOption.text}</option>` : '';
+            select.innerHTML = defaultOption + operatorOptionsHtml();
         });
     }
     window.addEventListener('DOMContentLoaded', loadOperatorsToDropdowns);

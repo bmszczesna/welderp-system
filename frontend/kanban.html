@@ -86,6 +86,7 @@
 
 				<div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
 					<a id="btnDownloadPdf" href="#" class="btn" style="background: #3b82f6; color: white; text-decoration: none; display: flex; align-items: center; gap: 5px;">Pobierz kartę PDF</a>
+					<button id="btnNeedsCorrection" class="btn btn-danger-soft" style="display: none;" onclick="markNeedsCorrection(currentOpenOrderId)">Do poprawy</button>
 					<button id="btnEditOrder" class="btn" style="background: #fbbf24; color: #92400e; border-color: #fbbf24;" onclick="switchToEditMode()">Edytuj dane zlecenia</button>
 				</div>
 			</div>
@@ -108,9 +109,6 @@
 							<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">Operator Główny</label>
 							<select id="editOperator" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; margin-top: 6px; background: #f9fafb; font-family: inherit; font-size: 14px; color: #111827;">
 								<option value="">Nie przypisano</option>
-								<option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
-								<option value="Tomasz Nowak">Tomasz Nowak</option>
-								<option value="Anna Wiśniewska">Anna Wiśniewska</option>
 							</select>
 						</div>
 						<div class="info-box" style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); background: var(--card);">
@@ -190,6 +188,13 @@
 		let searchQuery = "";
 		let messageTimer = null;
 		let currentOpenOrderId = null;
+		let availableOperators = [];
+
+		function operatorOptionsHtml() {
+			return availableOperators.map(op =>
+				`<option value="${op.name}">${op.name}</option>`
+			).join('');
+		}
 
 		function showMessage(text, type = "info") {
 			const el = document.getElementById("message");
@@ -230,6 +235,8 @@
 
 			const btnEdit = document.getElementById('btnEditOrder');
 			btnEdit.style.display = (order.status === 'COMPLETED' || order.status === 'ARCHIVED') ? 'none' : 'inline-block';
+			const btnNeedsCorrection = document.getElementById('btnNeedsCorrection');
+			btnNeedsCorrection.style.display = order.status === 'QUALITY_CHECK' ? 'inline-block' : 'none';
 
 			let partsHtml = `<ol class="modal-parts-list" style="padding-left: 20px; list-style-type: decimal;">`;
 
@@ -238,13 +245,24 @@
 					const pdfsHtml = (part.pdfs && part.pdfs.length > 0)
 						? part.pdfs.map(pdf => `<a href="/uploads/${pdf.file_name}" target="_blank" class="pdf-badge" style="margin-left:5px;">PDF</a>`).join('')
 						: '';
+					const materialText = part.material ? part.material : 'Brak wpisanego materiału';
+					const materialButtonText = part.material_missing ? 'Materiał uzupełniony' : 'Brak materiału';
+					const materialButtonClass = part.material_missing ? 'material-ok-btn' : 'material-missing-btn';
+					const missingBadge = part.material_missing ? `<span class="material-missing-label">Brak materiału</span>` : '';
+					const canChangeMaterialStatus = order.status !== 'COMPLETED' && order.status !== 'ARCHIVED';
+					const materialActionHtml = canChangeMaterialStatus
+						? `<button type="button" class="part-material-btn ${materialButtonClass}" onclick="togglePartMaterialMissing(${part.id}, ${!part.material_missing})">${materialButtonText}</button>`
+						: '';
 
 					partsHtml += `
 						<li style="margin-bottom: 15px;">
-							<div style="display: flex; align-items: center; gap: 10px; margin-bottom: 5px; flex-wrap: wrap;">
+							<div class="part-detail-row">
 								<span class="part-name-text" style="font-weight: 600;">${part.part_name}</span>
+								<span class="material-badge">Materiał: ${materialText}</span>
+								${missingBadge}
 								<span style="font-size: 12px; color: #1e40af; background: #dbeafe; padding: 2px 8px; border-radius: 12px;">👤 ${part.operator || 'Brak'}</span>
 								<div class="part-pdfs">${pdfsHtml}</div>
+								${materialActionHtml}
 							</div>
 							<ol class="modal-steps-list" style="margin-top: 5px; padding-left: 30px;">
 								${part.steps.map(step => {
@@ -252,11 +270,11 @@
 									const disabled = order.status !== 'IN_PROGRESS' ? "disabled" : "";
 									const completedClass = step.is_completed ? "completed" : "";
 									return `
-										<div class="step-item" style="margin-bottom: 5px;">
-										   <label style="display: flex; align-items: center; width: 100%; cursor: pointer;">
+										<div class="step-item">
+										   <label class="step-check-row">
 											  <input type="checkbox" ${checked} ${disabled} onchange="toggleStep(${step.id}, this)">
-											  <span class="step-text ${completedClass}" style="margin-left: 10px;">${step.step_name}</span>
-											  <span>👤 ${step.operator || 'Brak'}</span>
+											  <span class="step-text ${completedClass}">${step.step_name}</span>
+											  <span class="step-operator">👤 ${step.operator || 'Brak'}</span>
 										   </label>
 										</div>
 									`;
@@ -276,9 +294,10 @@
 			document.getElementById('orderModal').style.display = "block";
 		}
 
-		function switchToEditMode() {
+		async function switchToEditMode() {
     		const order = orders.find(o => o.id === currentOpenOrderId);
     		if (!order) return;
+			await refreshOperatorDropdowns();
 
     		document.getElementById('modalViewContainer').style.display = 'none';
     		document.getElementById('modalEditContainer').style.display = 'block';
@@ -321,16 +340,24 @@
 			}
 
 			partEl.innerHTML = `
-			   <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-				  <input type="text" class="edit-part-name" placeholder="Nazwa części" value="${part.part_name || ''}" style="flex: 2; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
-				  <select class="edit-part-operator" style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb; font-size: 14px;">
-					 <option value="">-- Operator z zamówienia --</option>
-					 <option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
-					 <option value="Tomasz Nowak">Tomasz Nowak</option>
-					 <option value="Anna Wiśniewska">Anna Wiśniewska</option>
-				  </select>
-				  <button type="button" class="remove-part-btn" style="color: #ef4444; border: none; background: #fee2e2; border-radius: 6px; padding: 0 12px; font-weight: bold; cursor: pointer;">X</button>
+			   <div style="display: grid; grid-template-columns: minmax(180px, 2fr) minmax(150px, 1fr) auto; gap: 10px; margin-bottom: 15px; align-items: end;">
+				  <label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">
+					 Nazwa części
+					 <input type="text" class="edit-part-name" placeholder="Nazwa części" value="${part.part_name || ''}" style="width: 100%; margin-top: 6px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+				  </label>
+				  <label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">
+					 Operator
+					 <select class="edit-part-operator" style="width: 100%; margin-top: 6px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb; font-size: 14px;">
+						<option value="">-- Operator z zamówienia --</option>
+						${operatorOptionsHtml()}
+					 </select>
+				  </label>
+				  <button type="button" class="remove-part-btn" style="width: 36px; height: 36px; min-width: 36px; align-self: end; display: inline-flex; align-items: center; justify-content: center; color: #ef4444; border: none; background: #fee2e2; border-radius: 6px; padding: 0; font-weight: bold; cursor: pointer;">X</button>
 			   </div>
+			   <label style="display: block; font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase; margin-bottom: 15px;">
+				  Materiał
+				  <input type="text" class="edit-part-material" placeholder="Materiał" value="${part.material || ''}" style="width: 100%; margin-top: 6px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+			   </label>
 
 			   <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
 				  <label style="font-size: 11px; font-weight: bold; color: #4b5563; text-transform: uppercase; display: block; margin-bottom: 8px;">Załączniki PDF</label>
@@ -343,7 +370,10 @@
 				</div>
 			   </div>
 
-			   <div class="edit-steps-container" style="margin-left: 20px; border-left: 2px solid #cbd5e1; padding-left: 15px;"></div>
+			   <div style="margin-left: 20px; border-left: 2px solid #cbd5e1; padding-left: 15px;">
+				  <div style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase; margin-bottom: 8px;">Kroki technologiczne</div>
+				  <div class="edit-steps-container"></div>
+			   </div>
 			   <button type="button" class="add-step-btn btn" style="margin-top: 10px; margin-left: 20px; font-size: 12px; padding: 6px 10px; cursor: pointer; background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;">+ Dodaj krok</button>
 			`;
 
@@ -367,22 +397,37 @@
 			container.appendChild(partEl);
 		}
 
+	function refreshEditStepNumbers(container) {
+		container.querySelectorAll('.edit-step-item').forEach((stepEl, index) => {
+			const numberEl = stepEl.querySelector('.edit-step-number');
+			if (numberEl) {
+				numberEl.textContent = `Krok ${index + 1}`;
+			}
+		});
+	}
+
 	function addStepToEditUI(container, step = {}) {
 		const stepEl = document.createElement('div');
 		stepEl.className = 'edit-step-item';
-		stepEl.style.display = 'flex';
+		stepEl.style.display = 'grid';
+		stepEl.style.gridTemplateColumns = '72px minmax(160px, 2fr) minmax(140px, 1fr) auto';
 		stepEl.style.gap = '8px';
 		stepEl.style.marginBottom = '8px';
-		stepEl.style.alignItems = 'center';
+		stepEl.style.alignItems = 'end';
 
 		stepEl.innerHTML = `
-			<input type="text" class="edit-step-name" placeholder="Nazwa kroku" value="${step.step_name || ''}" style="flex: 2; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 13px;">
-			<select class="edit-step-operator" style="flex: 1; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb; font-family: inherit; font-size: 13px;">
-				<option value="">-- Operator z części --</option>
-				<option value="Tobiasz Kowalczyk">Tobiasz Kowalczyk</option>
-				<option value="Tomasz Nowak">Tomasz Nowak</option>
-				<option value="Anna Wiśniewska">Anna Wiśniewska</option>
-			</select>
+			<span class="edit-step-number" style="font-size: 12px; font-weight: bold; color: #374151; padding-bottom: 8px;">Krok</span>
+			<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">
+				Nazwa kroku
+				<input type="text" class="edit-step-name" placeholder="Nazwa kroku" value="${step.step_name || ''}" style="width: 100%; margin-top: 6px; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 13px;">
+			</label>
+			<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">
+				Operator
+				<select class="edit-step-operator" style="width: 100%; margin-top: 6px; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; background: #f9fafb; font-family: inherit; font-size: 13px;">
+					<option value="">-- Operator z części --</option>
+					${operatorOptionsHtml()}
+				</select>
+			</label>
 			<button type="button" class="remove-step-btn" title="Usuń krok" style="color: #ef4444; border: none; background: #fee2e2; border-radius: 6px; padding: 6px 10px; font-weight: bold; cursor: pointer; transition: 0.2s;">X</button>
 		`;
 
@@ -390,9 +435,11 @@
 
 		stepEl.querySelector('.remove-step-btn').addEventListener('click', () => {
 			container.removeChild(stepEl);
+			refreshEditStepNumbers(container);
 		});
 
 		container.appendChild(stepEl);
+		refreshEditStepNumbers(container);
 	}
 
 	async function saveOrderChanges() {
@@ -417,23 +464,18 @@
 			parts: []
 		};
 
-		let hasError = false;
-		let partCount = 0;
-
 		document.querySelectorAll('.edit-part-item').forEach(pBlock => {
 			const partName = pBlock.querySelector('.edit-part-name').value.trim();
-			if (!partName) { hasError = true; return; }
-			partCount++;
 
 			const part = {
 				part_name: partName,
+				material: pBlock.querySelector('.edit-part-material').value.trim() || null,
 				operator: pBlock.querySelector('.edit-part-operator').value || null,
 				steps: []
 			};
 			
 			pBlock.querySelectorAll('.edit-step-item').forEach(sRow => {
 				const stepName = sRow.querySelector('.edit-step-name').value.trim();
-				if (!stepName) { hasError = true; return; }
 
 				part.steps.push({
 					step_name: stepName,
@@ -443,11 +485,6 @@
 			
 			payload.parts.push(part);
 		});
-
-		if (partCount === 0 || hasError) {
-			alert("Błąd: Zlecenie musi mieć poprawne nazwy części i kroków (nie mogą być puste)!");
-			return;
-		}
 
 		try {
 			const res = await fetch(`/orders/${orderId}`, {
@@ -488,6 +525,8 @@
 			card.draggable = true;
 			card.dataset.orderId = String(order.id);
 			card.dataset.status = order.status;
+			const hasMissingMaterial = order.parts && order.parts.some(part => part.material_missing);
+			const needsCorrection = order.needs_correction && order.status !== 'COMPLETED' && order.status !== 'ARCHIVED';
 
 			if (order.is_approved && order.status !== 'COMPLETED' && order.status !== 'ARCHIVED') {
 				card.style.border = '2px solid #10b981';
@@ -510,6 +549,20 @@
 				}
 			}
 
+			if (hasMissingMaterial) {
+				card.classList.add('material-missing-card');
+				card.style.border = '2px solid #f97316';
+				card.style.boxShadow = '0 0 12px rgba(249, 115, 22, 0.35)';
+				card.style.backgroundColor = '#fff7ed';
+			}
+
+			if (needsCorrection) {
+				card.classList.add('needs-correction-card');
+				card.style.border = '2px solid #dc2626';
+				card.style.boxShadow = '0 0 14px rgba(220, 38, 38, 0.42)';
+				card.style.backgroundColor = '#fef2f2';
+			}
+
 			card.onclick = (e) => {
 				if (!e.target.closest('button')) {
 					openModal(order.id);
@@ -517,10 +570,12 @@
 			};
 
             const deadlineStr = order.date_deadline ? order.date_deadline.slice(0, 10) : "Brak terminu";
+			const missingMaterialHtml = hasMissingMaterial ? `<p class="card-alert">Brak materiału</p>` : '';
+			const needsCorrectionHtml = needsCorrection ? `<p class="card-alert correction-alert">Do poprawy - priorytet</p>` : '';
 
 			let approveBtnHtml = '';
 			if (order.status === "QUALITY_CHECK" && !order.is_approved) {
-				approveBtnHtml = `<button class="btn" style="background:#10b981;color:white;width:100%;margin-top:10px;border:none;" onclick="approveOrder(event, ${order.id})">Zatwierdź jakość</button>`;
+				approveBtnHtml = `<button class="btn btn-success-card" onclick="approveOrder(event, ${order.id})">Zatwierdź jakość</button>`;
 			}
 
 			card.innerHTML = `
@@ -528,6 +583,8 @@
 					<p class="order-number"><strong>${order.order_number}</strong></p>
 				</div>
                 <p class="order-deadline">${deadlineStr}</p>
+				${missingMaterialHtml}
+				${needsCorrectionHtml}
 				${approveBtnHtml}
                  ${order.status === "COMPLETED" ? `
                 <button class="archive-btn-large" style="margin-top:10px;width:100%;"
@@ -618,6 +675,11 @@
 			
 			if (targetStatus === 'COMPLETED' && !current.is_approved) {
 				showMessage("Wymagane jest zatwierdzenie jakości przed zakończeniem!", "error");
+				return;
+			}
+
+			if (targetStatus !== 'IN_QUEUE' && current.parts && current.parts.some(part => part.material_missing)) {
+				showMessage("Najpierw odkliknij brak materiału przy części.", "error");
 				return;
 			}
 
@@ -745,6 +807,36 @@
 		}
 	}
 
+	async function markNeedsCorrection(orderId) {
+		if (!orderId) return;
+
+		try {
+			const res = await fetch(`/orders/${orderId}/needs-correction`, { method: "PUT" });
+			if (!res.ok) throw new Error();
+
+			showMessage("Zlecenie wróciło do realizacji", "success");
+			closeModal();
+			await loadOrders();
+		} catch (e) {
+			showMessage("Nie udało się oznaczyć do poprawy", "error");
+		}
+	}
+
+	async function togglePartMaterialMissing(partId, missing) {
+		try {
+			const res = await fetch(`/parts/${partId}/material-missing?missing=${missing}`, { method: "PUT" });
+			if (!res.ok) throw new Error();
+
+			showMessage(missing ? "Oznaczono brak materiału" : "Materiał uzupełniony", "success");
+			await loadOrders();
+			if (currentOpenOrderId) {
+				openModal(currentOpenOrderId);
+			}
+		} catch (e) {
+			showMessage("Nie udało się zmienić statusu materiału", "error");
+		}
+	}
+
 	async function toggleStep(stepId, checkbox) {
 		const textSpan = checkbox.nextElementSibling;
 		try {
@@ -853,7 +945,7 @@
 	async function refreshOperatorDropdowns() {
 		try {
 			const res = await fetch('/operators/');
-			const ops = await res.json();
+			availableOperators = await res.json();
 
 			const operatorSelects = document.querySelectorAll('select.part-operator, select.step-operator, select#editOperator, select.edit-part-operator, select.edit-step-operator');
 
@@ -861,9 +953,7 @@
 				const currentVal = select.value;
 				const defaultOption = select.querySelector('option[value=""]') ? `<option value="">${select.querySelector('option[value=""]').text}</option>` : '';
 
-				select.innerHTML = defaultOption + ops.map(op =>
-					`<option value="${op.name}">${op.name}</option>`
-				).join('');
+				select.innerHTML = defaultOption + operatorOptionsHtml();
 
 				select.value = currentVal;
 			});

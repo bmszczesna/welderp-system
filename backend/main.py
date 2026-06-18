@@ -5,6 +5,7 @@ import os
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+from sqlalchemy import text
 from backend import models
 from backend import database
 from backend.models import OrderStatus
@@ -23,6 +24,36 @@ else:
 
 ai_model = genai.GenerativeModel('models/gemini-3-flash-preview')
 models.Base.metadata.create_all(bind=database.engine)
+
+def ensure_order_part_columns():
+    if "sqlite" not in database.DATABASE_URL:
+        return
+
+    with database.engine.begin() as connection:
+        columns = {
+            row[1]
+            for row in connection.execute(text("PRAGMA table_info(order_parts)")).fetchall()
+        }
+
+        if "material" not in columns:
+            connection.execute(text("ALTER TABLE order_parts ADD COLUMN material VARCHAR"))
+
+        if "material_missing" not in columns:
+            connection.execute(
+                text("ALTER TABLE order_parts ADD COLUMN material_missing BOOLEAN DEFAULT 0")
+            )
+
+        order_columns = {
+            row[1]
+            for row in connection.execute(text("PRAGMA table_info(orders)")).fetchall()
+        }
+
+        if "needs_correction" not in order_columns:
+            connection.execute(
+                text("ALTER TABLE orders ADD COLUMN needs_correction BOOLEAN DEFAULT 0")
+            )
+
+ensure_order_part_columns()
 
 UPLOAD_DIR = "uploads"
 
@@ -50,6 +81,7 @@ class StepCreate(BaseModel):
 
 class PartCreate(BaseModel):
     part_name: str
+    material: Optional[str] = None
     steps: List[StepCreate] = []
     operator: Optional[str] = None
 
@@ -66,6 +98,8 @@ class OrderCreate(BaseModel):
 class StepResponse(BaseModel):
     id: int
     step_name: str
+    operator: Optional[str] = None
+    is_completed: bool = False
     pdf_path: Optional[str] = None
     class Config:
         from_attributes = True
@@ -73,6 +107,8 @@ class StepResponse(BaseModel):
 class PartResponse(BaseModel):
     id: int
     part_name: str
+    material: Optional[str] = None
+    material_missing: bool = False
     operator: Optional[str] = None
     steps: List[StepResponse] = []
     class Config:
@@ -86,6 +122,7 @@ class OrderResponse(BaseModel):
     client_name: str
     status: OrderStatus
     is_approved: bool = False
+    needs_correction: bool = False
 
     date_received: Optional[datetime] = None
     date_deadline: Optional[datetime] = None
@@ -104,6 +141,7 @@ class StepUpdate(BaseModel):
 
 class PartUpdate(BaseModel):
     part_name: str
+    material: Optional[str] = None
     operator: Optional[str] = None
     steps: List[StepCreate] = []
 
@@ -157,7 +195,12 @@ def create_order(order: OrderCreate, db: Session = Depends(database.get_db)):
     db.refresh(new_order)
 
     for part in order.parts:
-        new_part = models.OrderPart(part_name=part.part_name, order_id=new_order.id, operator=part.operator)
+        new_part = models.OrderPart(
+            part_name=part.part_name,
+            material=part.material,
+            order_id=new_order.id,
+            operator=part.operator
+        )
         db.add(new_part)
         db.flush()
 
@@ -184,13 +227,24 @@ def get_orders(db: Session = Depends(database.get_db)):
             "date_deadline": o.date_deadline,
             "status": o.status.value if o.status else None,
             "is_approved": o.is_approved,
+            "needs_correction": o.needs_correction,
             "operator": o.operator,
             "parts": [
                 {
                     "id": p.id,
                     "part_name": p.part_name,
+                    "material": p.material,
+                    "material_missing": p.material_missing,
                     "operator": p.operator,
-                    "steps": [ { "id": s.id, "step_name": s.step_name, "operator": s.operator} for s in p.steps],
+                    "steps": [
+                        {
+                            "id": s.id,
+                            "step_name": s.step_name,
+                            "operator": s.operator,
+                            "is_completed": s.is_completed
+                        }
+                        for s in p.steps
+                    ],
                     "pdfs": [{"id": pdf.id, "file_name": pdf.file_name} for pdf in p.pdfs]
                 }
                 for p in o.parts
@@ -221,6 +275,9 @@ def update_status(order_id: int, status: str, db: Session = Depends(database.get
         order.status = OrderStatus(status)
     except:
         raise HTTPException(status_code=400, detail="Invalid status")
+
+    if order.status != OrderStatus.IN_PROGRESS:
+        order.needs_correction = False
 
     db.commit()
     db.refresh(order)
@@ -256,8 +313,50 @@ def approve_order(order_id: int, db: Session = Depends(database.get_db)):
         raise HTTPException(status_code=404, detail="Nie znaleziono zlecenia")
     
     order.is_approved = True
+    order.needs_correction = False
     db.commit()
     return {"message": "Zlecenie zatwierdzone"}
+
+@app.put("/orders/{order_id}/needs-correction")
+def mark_order_needs_correction(order_id: int, db: Session = Depends(database.get_db)):
+    order = db.query(models.Order).filter(models.Order.id == order_id).first()
+    if not order:
+        raise HTTPException(status_code=404, detail="Nie znaleziono zlecenia")
+
+    order.status = OrderStatus.IN_PROGRESS
+    order.is_approved = False
+    order.needs_correction = True
+    db.commit()
+    db.refresh(order)
+
+    return {"message": "Zlecenie przeniesione do realizacji", "status": order.status.value}
+
+@app.put("/parts/{part_id}/material-missing")
+def set_part_material_missing(
+    part_id: int,
+    missing: bool = True,
+    db: Session = Depends(database.get_db)
+):
+    part = db.query(models.OrderPart).filter(models.OrderPart.id == part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="Nie znaleziono czesci")
+
+    part.material_missing = missing
+
+    if missing and part.owner:
+        part.owner.status = OrderStatus.IN_QUEUE
+        part.owner.is_approved = False
+        part.owner.needs_correction = False
+
+    db.commit()
+    db.refresh(part)
+
+    return {
+        "message": "Status materialu zaktualizowany",
+        "part_id": part.id,
+        "material_missing": part.material_missing,
+        "order_status": part.owner.status.value if part.owner and part.owner.status else None
+    }
 
 @app.put("/orders/{order_id}")
 def update_order(order_id: int, order_update: OrderUpdate, db: Session = Depends(database.get_db)):
@@ -275,7 +374,12 @@ def update_order(order_id: int, order_update: OrderUpdate, db: Session = Depends
     db.commit()
 
     for part in order_update.parts:
-        new_part = models.OrderPart(part_name=part.part_name, order_id=order.id, operator=part.operator)
+        new_part = models.OrderPart(
+            part_name=part.part_name,
+            material=part.material,
+            order_id=order.id,
+            operator=part.operator
+        )
         db.add(new_part)
         db.flush()
 

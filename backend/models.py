@@ -38,11 +38,12 @@ class Order(Base):
     # Status
     status = Column(Enum(OrderStatus), default=OrderStatus.IN_QUEUE)
     is_approved = Column(Boolean, default=False)
+    needs_correction = Column(Boolean, default=False)
 
     operator = Column(String, nullable=True)
 
     # Relationship: One order can have multiple parts
-    parts = relationship("OrderPart", back_populates="owner", cascade="all, delete-orphan")
+    parts = relationship("OrderPart", back_populates="owner", cascade="all, delete-orphan", order_by="OrderPart.id")
 
 
 class OrderPart(Base):
@@ -50,13 +51,15 @@ class OrderPart(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     part_name = Column(String, nullable=False)
+    material = Column(String, nullable=True)
+    material_missing = Column(Boolean, default=False)
     order_id = Column(Integer, ForeignKey("orders.id"))
     operator = Column(String, nullable=True)
 
     pdfs = relationship("PartPDF", back_populates="part", cascade="all, delete-orphan")
 
     owner = relationship("Order", back_populates="parts")
-    steps = relationship("ProcessStep", back_populates="owner_part", cascade="all, delete-orphan")
+    steps = relationship("ProcessStep", back_populates="owner_part", cascade="all, delete-orphan", order_by="ProcessStep.id")
 
 class ProcessStep(Base):
     __tablename__ = "process_steps"

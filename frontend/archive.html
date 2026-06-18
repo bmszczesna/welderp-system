@@ -359,6 +359,10 @@ function openArchiveModal(orderId) {
             `;
 
             order.parts.forEach(part => {
+                const partMaterialUsage =
+                    part.material_quantity !== null && part.material_quantity !== undefined
+                    ? `${escapeHtml(part.material_quantity)} ${escapeHtml(part.material_unit || "")}`
+                    : "Brak";
 
                 html += `
 
@@ -396,6 +400,22 @@ function openArchiveModal(orderId) {
 
                             </span>
 
+                        </div>
+
+                        <div style="
+                            display: grid;
+                            grid-template-columns: repeat(2, minmax(140px, 1fr));
+                            gap: 8px 12px;
+                            margin-bottom: 12px;
+                            padding: 10px;
+                            border: 1px solid #e5e7eb;
+                            border-radius: 8px;
+                            background: #ffffff;
+                            font-size: 12px;
+                            color: #4b5563;
+                        ">
+                            <span><strong>Materiał:</strong> ${escapeHtml(part.material || "Brak")}</span>
+                            <span><strong>Zużyta ilość:</strong> ${partMaterialUsage}</span>
                         </div>
                 `;
 
@@ -457,15 +477,7 @@ function openArchiveModal(orderId) {
                                     ">
 
                                         <span><strong>Operator:</strong> ${escapeHtml(step.operator || "Brak")}</span>
-                                        <span><strong>Potwierdził:</strong> ${escapeHtml(step.completed_by || "Brak")}</span>
                                         <span><strong>Data wykonania:</strong> ${escapeHtml(formatDateTime(step.completed_at))}</span>
-                                        <span><strong>Materiał:</strong> ${escapeHtml(step.material_used || part.material || "Brak")}</span>
-                                        <span><strong>Ilość:</strong> ${
-                                            step.material_quantity !== null && step.material_quantity !== undefined
-                                            ? `${escapeHtml(step.material_quantity)} ${escapeHtml(step.material_unit || "")}`
-                                            : "Brak"
-                                        }</span>
-                                        <span><strong>Uwagi:</strong> ${escapeHtml(step.production_notes || "Brak")}</span>
 
                                     </div>
 

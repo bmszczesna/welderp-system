@@ -530,8 +530,8 @@ body {
     white-space: nowrap;
 }
 
-.production-record {
-    margin: 6px 0 10px 26px;
+.part-material-usage {
+    margin: 8px 0 10px 26px;
     padding: 10px;
     border: 1px solid #e5e7eb;
     border-radius: 8px;
@@ -555,12 +555,11 @@ body {
 
 .production-grid {
     display: grid;
-    grid-template-columns: minmax(120px, 1.1fr) minmax(130px, 1.1fr) minmax(78px, 0.7fr) minmax(70px, 0.6fr);
+    grid-template-columns: minmax(120px, 1fr) minmax(80px, 0.35fr);
     gap: 8px;
 }
 
-.production-grid label,
-.production-notes-label {
+.production-grid label {
     display: flex;
     flex-direction: column;
     gap: 4px;
@@ -570,8 +569,13 @@ body {
     text-transform: uppercase;
 }
 
-.production-grid input,
-.production-notes-label textarea {
+.production-material-info {
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #4b5563;
+}
+
+.production-grid input {
     width: 100%;
     border: 1px solid #d1d5db;
     border-radius: 6px;
@@ -583,14 +587,9 @@ body {
     text-transform: none;
 }
 
-.production-grid input:disabled,
-.production-notes-label textarea:disabled {
+.production-grid input:disabled {
     background: #f3f4f6;
     color: #6b7280;
-}
-
-.production-notes-label {
-    margin-top: 8px;
 }
 
 .production-save-btn {
@@ -612,7 +611,7 @@ body {
         width: fit-content;
     }
 
-    .production-record {
+    .part-material-usage {
         margin-left: 0;
     }
 

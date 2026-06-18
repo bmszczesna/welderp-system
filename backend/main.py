@@ -41,6 +41,10 @@ def ensure_missing_columns():
                 connection.execute(
                     text("ALTER TABLE order_parts ADD COLUMN material_missing BOOLEAN DEFAULT 0")
                 )
+            if "material_quantity" not in order_part_columns:
+                connection.execute(text("ALTER TABLE order_parts ADD COLUMN material_quantity FLOAT"))
+            if "material_unit" not in order_part_columns:
+                connection.execute(text("ALTER TABLE order_parts ADD COLUMN material_unit VARCHAR"))
 
             order_columns = {
                 row[1]
@@ -75,6 +79,8 @@ def ensure_missing_columns():
             postgres_columns = [
                 "ALTER TABLE order_parts ADD COLUMN IF NOT EXISTS material VARCHAR",
                 "ALTER TABLE order_parts ADD COLUMN IF NOT EXISTS material_missing BOOLEAN DEFAULT false",
+                "ALTER TABLE order_parts ADD COLUMN IF NOT EXISTS material_quantity DOUBLE PRECISION",
+                "ALTER TABLE order_parts ADD COLUMN IF NOT EXISTS material_unit VARCHAR",
                 "ALTER TABLE orders ADD COLUMN IF NOT EXISTS needs_correction BOOLEAN DEFAULT false",
                 "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP",
                 "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS completed_by VARCHAR",
@@ -86,6 +92,42 @@ def ensure_missing_columns():
 
             for statement in postgres_columns:
                 connection.execute(text(statement))
+
+        connection.execute(text("""
+            UPDATE order_parts
+            SET material_quantity = (
+                SELECT SUM(material_quantity)
+                FROM process_steps
+                WHERE process_steps.part_id = order_parts.id
+                  AND process_steps.material_quantity IS NOT NULL
+            )
+            WHERE material_quantity IS NULL
+              AND EXISTS (
+                  SELECT 1
+                  FROM process_steps
+                  WHERE process_steps.part_id = order_parts.id
+                    AND process_steps.material_quantity IS NOT NULL
+              )
+        """))
+        connection.execute(text("""
+            UPDATE order_parts
+            SET material_unit = (
+                SELECT material_unit
+                FROM process_steps
+                WHERE process_steps.part_id = order_parts.id
+                  AND process_steps.material_unit IS NOT NULL
+                  AND process_steps.material_unit != ''
+                LIMIT 1
+            )
+            WHERE material_unit IS NULL
+              AND EXISTS (
+                  SELECT 1
+                  FROM process_steps
+                  WHERE process_steps.part_id = order_parts.id
+                    AND process_steps.material_unit IS NOT NULL
+                    AND process_steps.material_unit != ''
+              )
+        """))
 
 ensure_missing_columns()
 
@@ -123,6 +165,8 @@ class StepCreate(BaseModel):
 class PartCreate(BaseModel):
     part_name: str
     material: Optional[str] = None
+    material_quantity: Optional[float] = None
+    material_unit: Optional[str] = None
     steps: List[StepCreate] = []
     operator: Optional[str] = None
 
@@ -156,6 +200,8 @@ class PartResponse(BaseModel):
     part_name: str
     material: Optional[str] = None
     material_missing: bool = False
+    material_quantity: Optional[float] = None
+    material_unit: Optional[str] = None
     operator: Optional[str] = None
     steps: List[StepResponse] = []
     class Config:
@@ -204,8 +250,14 @@ class StepProductionRecord(BaseModel):
 class PartUpdate(BaseModel):
     part_name: str
     material: Optional[str] = None
+    material_quantity: Optional[float] = None
+    material_unit: Optional[str] = None
     operator: Optional[str] = None
     steps: List[StepCreate] = []
+
+class PartMaterialUsage(BaseModel):
+    material_quantity: Optional[float] = None
+    material_unit: Optional[str] = None
 
 class OrderUpdate(BaseModel):
     order_number: str
@@ -260,6 +312,8 @@ def create_order(order: OrderCreate, db: Session = Depends(database.get_db)):
         new_part = models.OrderPart(
             part_name=part.part_name,
             material=part.material,
+            material_quantity=part.material_quantity,
+            material_unit=part.material_unit,
             order_id=new_order.id,
             operator=part.operator
         )
@@ -308,6 +362,8 @@ def get_orders(db: Session = Depends(database.get_db)):
                     "part_name": p.part_name,
                     "material": p.material,
                     "material_missing": p.material_missing,
+                    "material_quantity": p.material_quantity,
+                    "material_unit": p.material_unit,
                     "operator": p.operator,
                     "steps": [
                         {
@@ -369,6 +425,9 @@ def delete_order(order_id: int, db: Session = Depends(database.get_db)):
 
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
+
+    if order.status != OrderStatus.IN_QUEUE:
+        raise HTTPException(status_code=400, detail="Można usunąć tylko zlecenie oczekujące")
 
     db.delete(order)
     db.commit()
@@ -437,6 +496,37 @@ def set_part_material_missing(
         "order_status": part.owner.status.value if part.owner and part.owner.status else None
     }
 
+@app.put("/parts/{part_id}/material-usage")
+def update_part_material_usage(
+    part_id: int,
+    usage: PartMaterialUsage,
+    db: Session = Depends(database.get_db)
+):
+    part = db.query(models.OrderPart).filter(models.OrderPart.id == part_id).first()
+    if not part:
+        raise HTTPException(status_code=404, detail="Nie znaleziono czesci")
+
+    if usage.material_quantity is not None and usage.material_quantity < 0:
+        raise HTTPException(status_code=400, detail="Ilość materiału nie może być ujemna")
+
+    part.material_quantity = usage.material_quantity
+    part.material_unit = usage.material_unit.strip() if usage.material_unit else None
+    for step in part.steps:
+        step.material_used = None
+        step.material_quantity = None
+        step.material_unit = None
+        step.production_notes = None
+
+    db.commit()
+    db.refresh(part)
+
+    return {
+        "message": "Zużycie materiału zaktualizowane",
+        "part_id": part.id,
+        "material_quantity": part.material_quantity,
+        "material_unit": part.material_unit,
+    }
+
 @app.put("/orders/{order_id}")
 def update_order(order_id: int, order_update: OrderUpdate, db: Session = Depends(database.get_db)):
     order = db.query(models.Order).filter(models.Order.id == order_id).first()
@@ -456,6 +546,8 @@ def update_order(order_id: int, order_update: OrderUpdate, db: Session = Depends
         new_part = models.OrderPart(
             part_name=part.part_name,
             material=part.material,
+            material_quantity=part.material_quantity,
+            material_unit=part.material_unit,
             order_id=order.id,
             operator=part.operator
         )
@@ -554,6 +646,11 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
 
     parts_html = ""
     for part_index, part in enumerate(order.parts, start=1):
+        part_quantity = (
+            f"{part.material_quantity:g} {escape(part.material_unit or '')}".strip()
+            if part.material_quantity is not None
+            else "-"
+        )
         attachment_html = (
             "".join(
                 f"""
@@ -571,13 +668,6 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
         steps_rows = ""
         for step in part.steps:
             step_status = "Wykonany" if step.is_completed else "Niewykonany"
-            quantity = (
-                f"{step.material_quantity:g} {escape(step.material_unit or '')}".strip()
-                if step.material_quantity is not None
-                else "-"
-            )
-            material = escape(step.material_used or part.material or "-")
-            notes = escape(step.production_notes or "-")
 
             steps_rows += f"""
                 <tr>
@@ -588,18 +678,14 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
                             {step_status}
                         </span>
                     </td>
-                    <td>{escape(step.completed_by or "-")}</td>
                     <td>{format_datetime(step.completed_at)}</td>
-                    <td>{material}</td>
-                    <td>{quantity}</td>
-                    <td>{notes}</td>
                 </tr>
             """
 
         if not steps_rows:
             steps_rows = """
                 <tr>
-                    <td colspan="8" class="empty-cell">Brak kroków technologicznych dla tej części</td>
+                    <td colspan="4" class="empty-cell">Brak kroków technologicznych dla tej części</td>
                 </tr>
             """
 
@@ -616,14 +702,14 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
                     <tr>
                         <th>Materiał</th>
                         <td>{escape(part.material or "-")}</td>
-                        <th>Status materiału</th>
-                        <td>{material_status}</td>
+                        <th>Zużyta ilość</th>
+                        <td>{part_quantity}</td>
                     </tr>
                     <tr>
+                        <th>Status materiału</th>
+                        <td>{material_status}</td>
                         <th>Operator części</th>
                         <td>{escape(part.operator or "-")}</td>
-                        <th>Liczba kroków</th>
-                        <td>{len(part.steps)}</td>
                     </tr>
                 </table>
 
@@ -634,11 +720,7 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
                             <th>Krok</th>
                             <th>Operator</th>
                             <th>Status</th>
-                            <th>Potwierdził</th>
                             <th>Data wykonania</th>
-                            <th>Materiał użyty</th>
-                            <th>Ilość</th>
-                            <th>Uwagi</th>
                         </tr>
                     </thead>
                     <tbody>

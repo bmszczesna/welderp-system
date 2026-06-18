@@ -53,6 +53,8 @@ class OrderPart(Base):
     part_name = Column(String, nullable=False)
     material = Column(String, nullable=True)
     material_missing = Column(Boolean, default=False)
+    material_quantity = Column(Float, nullable=True)
+    material_unit = Column(String, nullable=True)
     order_id = Column(Integer, ForeignKey("orders.id"))
     operator = Column(String, nullable=True)
 

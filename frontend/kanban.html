@@ -86,7 +86,7 @@
 
 				<div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
 					<a id="btnDownloadPdf" href="#" class="btn" style="background: #3b82f6; color: white; text-decoration: none; display: flex; align-items: center; gap: 5px;">Pobierz kartę PDF</a>
-					<button id="btnNeedsCorrection" class="btn btn-danger-soft" style="display: none;" onclick="markNeedsCorrection(currentOpenOrderId)">Do poprawy</button>
+					<button id="btnDeleteOrder" class="btn btn-danger-soft" style="display: none;" onclick="deleteOrder(currentOpenOrderId)">Usuń zlecenie</button>
 					<button id="btnEditOrder" class="btn" style="background: #fbbf24; color: #92400e; border-color: #fbbf24;" onclick="switchToEditMode()">Edytuj dane zlecenia</button>
 				</div>
 			</div>
@@ -257,8 +257,8 @@
 
 			const btnEdit = document.getElementById('btnEditOrder');
 			btnEdit.style.display = (order.status === 'COMPLETED' || order.status === 'ARCHIVED') ? 'none' : 'inline-block';
-			const btnNeedsCorrection = document.getElementById('btnNeedsCorrection');
-			btnNeedsCorrection.style.display = order.status === 'QUALITY_CHECK' ? 'inline-block' : 'none';
+			const btnDeleteOrder = document.getElementById('btnDeleteOrder');
+			btnDeleteOrder.style.display = order.status === 'IN_QUEUE' ? 'inline-block' : 'none';
 
 			let partsHtml = `<ol class="modal-parts-list" style="padding-left: 20px; list-style-type: decimal;">`;
 
@@ -275,6 +275,9 @@
 					const materialActionHtml = canChangeMaterialStatus
 						? `<button type="button" class="part-material-btn ${materialButtonClass}" onclick="togglePartMaterialMissing(${part.id}, ${!part.material_missing})">${materialButtonText}</button>`
 						: '';
+					const materialUsageDisabled = order.status !== 'IN_PROGRESS' ? "disabled" : "";
+					const partMaterialQuantity = part.material_quantity ?? "";
+					const partMaterialUnit = part.material_unit || "";
 
 					partsHtml += `
 						<li style="margin-bottom: 15px;">
@@ -286,16 +289,32 @@
 								<div class="part-pdfs">${pdfsHtml}</div>
 								${materialActionHtml}
 							</div>
+							<div class="part-material-usage" data-part-id="${part.id}">
+								<div class="production-record-head">
+									<strong>Zużycie materiału części</strong>
+								</div>
+								<div class="production-material-info">
+									Materiał części: <strong>${escapeHtml(part.material || 'Brak wpisanego materiału')}</strong>
+								</div>
+								<div class="production-grid">
+									<label>
+										Zużyta ilość
+										<input type="number" min="0" step="0.01" class="part-material-quantity" value="${escapeHtml(partMaterialQuantity)}" ${materialUsageDisabled}>
+									</label>
+									<label>
+										Jedn.
+										<input type="text" class="part-material-unit" value="${escapeHtml(partMaterialUnit)}" placeholder="kg / szt." ${materialUsageDisabled}>
+									</label>
+								</div>
+								${order.status === 'IN_PROGRESS' ? `
+									<button type="button" class="btn production-save-btn" onclick="savePartMaterialUsage(${part.id}, this.closest('.part-material-usage'))">Zapisz zużycie</button>
+								` : ""}
+							</div>
 							<ol class="modal-steps-list" style="margin-top: 5px; padding-left: 30px;">
 									${part.steps.map(step => {
 										const checked = step.is_completed ? "checked" : "";
 										const disabled = order.status !== 'IN_PROGRESS' ? "disabled" : "";
 										const completedClass = step.is_completed ? "completed" : "";
-										const completedBy = step.completed_by || step.operator || part.operator || order.operator || "";
-										const materialUsed = step.material_used || part.material || "";
-										const materialQuantity = step.material_quantity ?? "";
-										const materialUnit = step.material_unit || "";
-										const productionNotes = step.production_notes || "";
 										return `
 											<div class="step-item" data-step-id="${step.id}">
 											   <label class="step-check-row">
@@ -303,37 +322,6 @@
 												  <span class="step-text ${completedClass}">${escapeHtml(step.step_name)}</span>
 												  <span class="step-operator">Operator: ${escapeHtml(step.operator || 'Brak')}</span>
 											   </label>
-											   <div class="production-record">
-												  <div class="production-record-head">
-													 <strong>Rejestr produkcji</strong>
-													 <span>${escapeHtml(formatDateTime(step.completed_at))}</span>
-												  </div>
-												  <div class="production-grid">
-													 <label>
-														Potwierdził
-														<input type="text" class="step-completed-by" value="${escapeHtml(completedBy)}" ${disabled}>
-													 </label>
-													 <label>
-														Materiał użyty
-														<input type="text" class="step-material-used" value="${escapeHtml(materialUsed)}" ${disabled}>
-													 </label>
-													 <label>
-														Ilość
-														<input type="number" min="0" step="0.01" class="step-material-quantity" value="${escapeHtml(materialQuantity)}" ${disabled}>
-													 </label>
-													 <label>
-														Jedn.
-														<input type="text" class="step-material-unit" value="${escapeHtml(materialUnit)}" placeholder="kg / szt." ${disabled}>
-													 </label>
-												  </div>
-												  <label class="production-notes-label">
-													 Uwagi
-													 <textarea class="step-production-notes" rows="2" ${disabled}>${escapeHtml(productionNotes)}</textarea>
-												  </label>
-												  ${order.status === 'IN_PROGRESS' ? `
-													 <button type="button" class="btn production-save-btn" onclick="saveStepProductionRecord(${step.id}, this.closest('.step-item'))">Zapisz wpis</button>
-												  ` : ""}
-											   </div>
 											</div>
 										`;
 									}).join('')}
@@ -380,6 +368,8 @@
 			const container = document.getElementById('editPartsContainer');
 			const partEl = document.createElement('div');
 			partEl.className = 'edit-part-item';
+			partEl.dataset.materialQuantity = part.material_quantity ?? "";
+			partEl.dataset.materialUnit = part.material_unit || "";
 			partEl.style.border = '1px solid #e5e7eb';
 			partEl.style.padding = '14px';
 			partEl.style.marginBottom = '12px';
@@ -470,10 +460,6 @@
 		stepEl.dataset.isCompleted = step.is_completed ? "true" : "false";
 		stepEl.dataset.completedBy = step.completed_by || "";
 		stepEl.dataset.completedAt = step.completed_at || "";
-		stepEl.dataset.productionNotes = step.production_notes || "";
-		stepEl.dataset.materialUsed = step.material_used || "";
-		stepEl.dataset.materialQuantity = step.material_quantity ?? "";
-		stepEl.dataset.materialUnit = step.material_unit || "";
 		stepEl.style.display = 'grid';
 		stepEl.style.gridTemplateColumns = '72px minmax(160px, 2fr) minmax(140px, 1fr) auto';
 		stepEl.style.gap = '8px';
@@ -535,6 +521,8 @@
 			const part = {
 				part_name: partName,
 				material: pBlock.querySelector('.edit-part-material').value.trim() || null,
+				material_quantity: pBlock.dataset.materialQuantity === "" ? null : Number(pBlock.dataset.materialQuantity),
+				material_unit: pBlock.dataset.materialUnit || null,
 				operator: pBlock.querySelector('.edit-part-operator').value || null,
 				steps: []
 			};
@@ -548,10 +536,10 @@
 					is_completed: sRow.dataset.isCompleted === "true",
 					completed_by: sRow.dataset.completedBy || null,
 					completed_at: sRow.dataset.completedAt || null,
-					production_notes: sRow.dataset.productionNotes || null,
-					material_used: sRow.dataset.materialUsed || null,
-					material_quantity: sRow.dataset.materialQuantity === "" ? null : Number(sRow.dataset.materialQuantity),
-					material_unit: sRow.dataset.materialUnit || null
+					production_notes: null,
+					material_used: null,
+					material_quantity: null,
+					material_unit: null
 				});
 			});
 			
@@ -649,7 +637,7 @@
 			if (order.status === "QUALITY_CHECK") {
 				qualityActionsHtml = `
 					${!order.is_approved ? `<button class="btn btn-success-card" onclick="approveOrder(event, ${order.id})">Zatwierdź jakość</button>` : ""}
-					<button class="btn btn-correction-card" onclick="markNeedsCorrection(${order.id}, event)">Do poprawy</button>
+					${!order.is_approved ? `<button class="btn btn-correction-card" onclick="markNeedsCorrection(${order.id}, event)">Do poprawy</button>` : ""}
 				`;
 			}
 
@@ -898,6 +886,22 @@
 		}
 	}
 
+	async function deleteOrder(orderId) {
+		if (!orderId) return;
+		if (!confirm("Czy na pewno chcesz usunąć to zlecenie?")) return;
+
+		try {
+			const res = await fetch(`/orders/${orderId}`, { method: "DELETE" });
+			if (!res.ok) throw new Error();
+
+			showMessage("Zlecenie usunięte", "success");
+			closeModal();
+			await loadOrders();
+		} catch (e) {
+			showMessage("Nie udało się usunąć zlecenia", "error");
+		}
+	}
+
 	async function togglePartMaterialMissing(partId, missing) {
 		try {
 			const res = await fetch(`/parts/${partId}/material-missing?missing=${missing}`, { method: "PUT" });
@@ -930,22 +934,13 @@
 			if (!stepItem) return;
 
 			const checkbox = stepItem.querySelector('.step-complete-checkbox');
-			const quantityInput = stepItem.querySelector('.step-material-quantity');
-			const quantityValue = quantityInput.value.trim();
-			const materialQuantity = quantityValue === "" ? null : Number(quantityValue);
-
-			if (quantityValue !== "" && Number.isNaN(materialQuantity)) {
-				showMessage("Ilość materiału musi być liczbą", "error");
-				return;
-			}
-
 			const payload = {
 				is_completed: checkbox.checked,
-				completed_by: stepItem.querySelector('.step-completed-by').value.trim() || null,
-				production_notes: stepItem.querySelector('.step-production-notes').value.trim() || null,
-				material_used: stepItem.querySelector('.step-material-used').value.trim() || null,
-				material_quantity: materialQuantity,
-				material_unit: stepItem.querySelector('.step-material-unit').value.trim() || null
+				completed_by: null,
+				production_notes: null,
+				material_used: null,
+				material_quantity: null,
+				material_unit: null
 			};
 
 			try {
@@ -957,13 +952,52 @@
 
 				if (!res.ok) throw new Error();
 
-				showMessage("Wpis produkcyjny zapisany", "success");
 				await loadOrders();
 				if (currentOpenOrderId) {
 					openModal(currentOpenOrderId);
 				}
 			} catch (err) {
-				showMessage("Nie udało się zapisać wpisu produkcyjnego", "error");
+				showMessage("Nie udało się zapisać statusu kroku", "error");
+				await loadOrders();
+				if (currentOpenOrderId) {
+					openModal(currentOpenOrderId);
+				}
+			}
+		}
+
+		async function savePartMaterialUsage(partId, partBox) {
+			if (!partBox) return;
+
+			const quantityInput = partBox.querySelector('.part-material-quantity');
+			const quantityValue = quantityInput.value.trim();
+			const materialQuantity = quantityValue === "" ? null : Number(quantityValue);
+
+			if (quantityValue !== "" && Number.isNaN(materialQuantity)) {
+				showMessage("Ilość materiału musi być liczbą", "error");
+				return;
+			}
+
+			const payload = {
+				material_quantity: materialQuantity,
+				material_unit: partBox.querySelector('.part-material-unit').value.trim() || null
+			};
+
+			try {
+				const res = await fetch(`/parts/${partId}/material-usage`, {
+					method: "PUT",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(payload)
+				});
+
+				if (!res.ok) throw new Error();
+
+				showMessage("Zużycie materiału zapisane", "success");
+				await loadOrders();
+				if (currentOpenOrderId) {
+					openModal(currentOpenOrderId);
+				}
+			} catch (err) {
+				showMessage("Nie udało się zapisać zużycia materiału", "error");
 				await loadOrders();
 				if (currentOpenOrderId) {
 					openModal(currentOpenOrderId);

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Float, Text
 from sqlalchemy.orm import relationship
 from backend.database import Base
 import datetime
@@ -72,6 +72,12 @@ class ProcessStep(Base):
     part_id = Column(Integer, ForeignKey("order_parts.id"))
     owner_part = relationship("OrderPart", back_populates="steps")
     is_completed = Column(Boolean, default=False)
+    completed_at = Column(DateTime, nullable=True)
+    completed_by = Column(String, nullable=True)
+    production_notes = Column(Text, nullable=True)
+    material_used = Column(String, nullable=True)
+    material_quantity = Column(Float, nullable=True)
+    material_unit = Column(String, nullable=True)
 
 
 class PartPDF(Base):

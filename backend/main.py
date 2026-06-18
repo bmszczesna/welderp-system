@@ -5,11 +5,12 @@ import os
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+from html import escape
 from sqlalchemy import text
 from backend import models
 from backend import database
 from backend.models import OrderStatus
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from weasyprint import HTML
 import io
@@ -25,35 +26,68 @@ else:
 ai_model = genai.GenerativeModel('models/gemini-3-flash-preview')
 models.Base.metadata.create_all(bind=database.engine)
 
-def ensure_order_part_columns():
-    if "sqlite" not in database.DATABASE_URL:
-        return
-
+def ensure_missing_columns():
     with database.engine.begin() as connection:
-        columns = {
-            row[1]
-            for row in connection.execute(text("PRAGMA table_info(order_parts)")).fetchall()
-        }
+        if "sqlite" in database.DATABASE_URL:
+            order_part_columns = {
+                row[1]
+                for row in connection.execute(text("PRAGMA table_info(order_parts)")).fetchall()
+            }
 
-        if "material" not in columns:
-            connection.execute(text("ALTER TABLE order_parts ADD COLUMN material VARCHAR"))
+            if "material" not in order_part_columns:
+                connection.execute(text("ALTER TABLE order_parts ADD COLUMN material VARCHAR"))
 
-        if "material_missing" not in columns:
-            connection.execute(
-                text("ALTER TABLE order_parts ADD COLUMN material_missing BOOLEAN DEFAULT 0")
-            )
+            if "material_missing" not in order_part_columns:
+                connection.execute(
+                    text("ALTER TABLE order_parts ADD COLUMN material_missing BOOLEAN DEFAULT 0")
+                )
 
-        order_columns = {
-            row[1]
-            for row in connection.execute(text("PRAGMA table_info(orders)")).fetchall()
-        }
+            order_columns = {
+                row[1]
+                for row in connection.execute(text("PRAGMA table_info(orders)")).fetchall()
+            }
 
-        if "needs_correction" not in order_columns:
-            connection.execute(
-                text("ALTER TABLE orders ADD COLUMN needs_correction BOOLEAN DEFAULT 0")
-            )
+            if "needs_correction" not in order_columns:
+                connection.execute(
+                    text("ALTER TABLE orders ADD COLUMN needs_correction BOOLEAN DEFAULT 0")
+                )
 
-ensure_order_part_columns()
+            step_columns = {
+                row[1]
+                for row in connection.execute(text("PRAGMA table_info(process_steps)")).fetchall()
+            }
+            sqlite_step_columns = {
+                "completed_at": "DATETIME",
+                "completed_by": "VARCHAR",
+                "production_notes": "TEXT",
+                "material_used": "VARCHAR",
+                "material_quantity": "FLOAT",
+                "material_unit": "VARCHAR",
+            }
+
+            for column_name, column_type in sqlite_step_columns.items():
+                if column_name not in step_columns:
+                    connection.execute(
+                        text(f"ALTER TABLE process_steps ADD COLUMN {column_name} {column_type}")
+                    )
+
+        elif "postgresql" in database.DATABASE_URL:
+            postgres_columns = [
+                "ALTER TABLE order_parts ADD COLUMN IF NOT EXISTS material VARCHAR",
+                "ALTER TABLE order_parts ADD COLUMN IF NOT EXISTS material_missing BOOLEAN DEFAULT false",
+                "ALTER TABLE orders ADD COLUMN IF NOT EXISTS needs_correction BOOLEAN DEFAULT false",
+                "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP",
+                "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS completed_by VARCHAR",
+                "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS production_notes TEXT",
+                "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS material_used VARCHAR",
+                "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS material_quantity DOUBLE PRECISION",
+                "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS material_unit VARCHAR",
+            ]
+
+            for statement in postgres_columns:
+                connection.execute(text(statement))
+
+ensure_missing_columns()
 
 UPLOAD_DIR = "uploads"
 
@@ -78,6 +112,13 @@ app.add_middleware(
 class StepCreate(BaseModel):
     step_name: str
     operator: Optional[str] = None
+    is_completed: bool = False
+    completed_by: Optional[str] = None
+    completed_at: Optional[datetime] = None
+    production_notes: Optional[str] = None
+    material_used: Optional[str] = None
+    material_quantity: Optional[float] = None
+    material_unit: Optional[str] = None
 
 class PartCreate(BaseModel):
     part_name: str
@@ -100,6 +141,12 @@ class StepResponse(BaseModel):
     step_name: str
     operator: Optional[str] = None
     is_completed: bool = False
+    completed_by: Optional[str] = None
+    completed_at: Optional[datetime] = None
+    production_notes: Optional[str] = None
+    material_used: Optional[str] = None
+    material_quantity: Optional[float] = None
+    material_unit: Optional[str] = None
     pdf_path: Optional[str] = None
     class Config:
         from_attributes = True
@@ -138,6 +185,21 @@ class OrderResponse(BaseModel):
 class StepUpdate(BaseModel):
     step_name: str
     operator: Optional[str] = None
+    is_completed: bool = False
+    completed_by: Optional[str] = None
+    completed_at: Optional[datetime] = None
+    production_notes: Optional[str] = None
+    material_used: Optional[str] = None
+    material_quantity: Optional[float] = None
+    material_unit: Optional[str] = None
+
+class StepProductionRecord(BaseModel):
+    is_completed: bool
+    completed_by: Optional[str] = None
+    production_notes: Optional[str] = None
+    material_used: Optional[str] = None
+    material_quantity: Optional[float] = None
+    material_unit: Optional[str] = None
 
 class PartUpdate(BaseModel):
     part_name: str
@@ -205,7 +267,18 @@ def create_order(order: OrderCreate, db: Session = Depends(database.get_db)):
         db.flush()
 
         for step in part.steps:
-            new_step = models.ProcessStep(step_name=step.step_name, part_id=new_part.id, operator=step.operator)
+            new_step = models.ProcessStep(
+                step_name=step.step_name,
+                part_id=new_part.id,
+                operator=step.operator,
+                is_completed=step.is_completed,
+                completed_at=step.completed_at or (datetime.utcnow() if step.is_completed else None),
+                completed_by=step.completed_by,
+                production_notes=step.production_notes,
+                material_used=step.material_used,
+                material_quantity=step.material_quantity,
+                material_unit=step.material_unit,
+            )
             db.add(new_step)
 
     db.commit()
@@ -241,7 +314,13 @@ def get_orders(db: Session = Depends(database.get_db)):
                             "id": s.id,
                             "step_name": s.step_name,
                             "operator": s.operator,
-                            "is_completed": s.is_completed
+                            "is_completed": s.is_completed,
+                            "completed_by": s.completed_by,
+                            "completed_at": s.completed_at,
+                            "production_notes": s.production_notes,
+                            "material_used": s.material_used,
+                            "material_quantity": s.material_quantity,
+                            "material_unit": s.material_unit
                         }
                         for s in p.steps
                     ],
@@ -323,13 +402,13 @@ def mark_order_needs_correction(order_id: int, db: Session = Depends(database.ge
     if not order:
         raise HTTPException(status_code=404, detail="Nie znaleziono zlecenia")
 
-    order.status = OrderStatus.IN_PROGRESS
+    order.status = OrderStatus.IN_QUEUE
     order.is_approved = False
     order.needs_correction = True
     db.commit()
     db.refresh(order)
 
-    return {"message": "Zlecenie przeniesione do realizacji", "status": order.status.value}
+    return {"message": "Zlecenie przeniesione do oczekujących", "status": order.status.value}
 
 @app.put("/parts/{part_id}/material-missing")
 def set_part_material_missing(
@@ -384,7 +463,18 @@ def update_order(order_id: int, order_update: OrderUpdate, db: Session = Depends
         db.flush()
 
         for step in part.steps:
-            new_step = models.ProcessStep(step_name=step.step_name, part_id=new_part.id, operator=step.operator)
+            new_step = models.ProcessStep(
+                step_name=step.step_name,
+                part_id=new_part.id,
+                operator=step.operator,
+                is_completed=step.is_completed,
+                completed_at=step.completed_at or (datetime.utcnow() if step.is_completed else None),
+                completed_by=step.completed_by,
+                production_notes=step.production_notes,
+                material_used=step.material_used,
+                material_quantity=step.material_quantity,
+                material_unit=step.material_unit,
+            )
             db.add(new_step)
     
     db.commit()
@@ -426,27 +516,336 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
+    status_labels = {
+        "IN_QUEUE": "Oczekujące",
+        "IN_PROGRESS": "W realizacji",
+        "QUALITY_CHECK": "Kontrola jakości",
+        "COMPLETED": "Zakończone",
+        "ARCHIVED": "Archiwum",
+    }
+
+    def status_text(status):
+        if not status:
+            return "-"
+        value = status.value if hasattr(status, "value") else str(status)
+        return status_labels.get(value, value)
+
+    def format_date(value):
+        return value.strftime("%Y-%m-%d") if value else "-"
+
+    def format_datetime(value):
+        return value.strftime("%Y-%m-%d %H:%M") if value else "-"
+
+    def yes_no(value):
+        return "Tak" if value else "Nie"
+
+    missing_parts = [part for part in order.parts if part.material_missing]
+    missing_parts_html = (
+        "".join(f"<li>{escape(part.part_name)}</li>" for part in missing_parts)
+        if missing_parts
+        else "<li>Brak zgłoszonych braków materiałowych</li>"
+    )
+
+    correction_html = (
+        "<span class='badge badge-danger'>Do poprawy</span>"
+        if order.needs_correction
+        else "<span class='badge badge-ok'>Brak aktywnej poprawki</span>"
+    )
+
     parts_html = ""
-    for part in order.parts:
-        steps_list = "".join([f"<li>{s.step_name}</li>" for s in part.steps])
-        parts_html += f"<h3>Część: {part.part_name}</h3><ul>{steps_list}</ul>"
+    for part_index, part in enumerate(order.parts, start=1):
+        attachment_html = (
+            "".join(
+                f"""
+                <li>
+                    <strong>{escape(pdf.file_name)}</strong>
+                    <span class="muted">/uploads/{escape(pdf.file_name)}</span>
+                </li>
+                """
+                for pdf in part.pdfs
+            )
+            if part.pdfs
+            else "<li>Brak załączników PDF dla tej części</li>"
+        )
+
+        steps_rows = ""
+        for step in part.steps:
+            step_status = "Wykonany" if step.is_completed else "Niewykonany"
+            quantity = (
+                f"{step.material_quantity:g} {escape(step.material_unit or '')}".strip()
+                if step.material_quantity is not None
+                else "-"
+            )
+            material = escape(step.material_used or part.material or "-")
+            notes = escape(step.production_notes or "-")
+
+            steps_rows += f"""
+                <tr>
+                    <td>{escape(step.step_name)}</td>
+                    <td>{escape(step.operator or "-")}</td>
+                    <td>
+                        <span class="badge {'badge-ok' if step.is_completed else 'badge-muted'}">
+                            {step_status}
+                        </span>
+                    </td>
+                    <td>{escape(step.completed_by or "-")}</td>
+                    <td>{format_datetime(step.completed_at)}</td>
+                    <td>{material}</td>
+                    <td>{quantity}</td>
+                    <td>{notes}</td>
+                </tr>
+            """
+
+        if not steps_rows:
+            steps_rows = """
+                <tr>
+                    <td colspan="8" class="empty-cell">Brak kroków technologicznych dla tej części</td>
+                </tr>
+            """
+
+        material_status = (
+            "<span class='badge badge-danger'>Brak materiału</span>"
+            if part.material_missing
+            else "<span class='badge badge-ok'>Materiał dostępny</span>"
+        )
+
+        parts_html += f"""
+            <section class="part-section">
+                <h3>Część {part_index}: {escape(part.part_name)}</h3>
+                <table class="summary-table">
+                    <tr>
+                        <th>Materiał</th>
+                        <td>{escape(part.material or "-")}</td>
+                        <th>Status materiału</th>
+                        <td>{material_status}</td>
+                    </tr>
+                    <tr>
+                        <th>Operator części</th>
+                        <td>{escape(part.operator or "-")}</td>
+                        <th>Liczba kroków</th>
+                        <td>{len(part.steps)}</td>
+                    </tr>
+                </table>
+
+                <h4>Kroki procesu</h4>
+                <table class="steps-table">
+                    <thead>
+                        <tr>
+                            <th>Krok</th>
+                            <th>Operator</th>
+                            <th>Status</th>
+                            <th>Potwierdził</th>
+                            <th>Data wykonania</th>
+                            <th>Materiał użyty</th>
+                            <th>Ilość</th>
+                            <th>Uwagi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {steps_rows}
+                    </tbody>
+                </table>
+
+                <h4>Załączniki PDF</h4>
+                <ul class="attachments-list">
+                    {attachment_html}
+                </ul>
+            </section>
+        """
 
     full_html = f"""
-    <html>
+    <!DOCTYPE html>
+    <html lang="pl">
         <head>
+            <meta charset="UTF-8">
             <style>
                 @page {{ size: A4; margin: 15mm; }}
-                body {{ font-family: sans-serif; }}
-                h1 {{ color: #ef4444; border-bottom: 2px solid #ef4444; }}
-                h3 {{ background: #f3f4f6; padding: 5px; }}
+                body {{
+                    font-family: DejaVu Sans, sans-serif;
+                    color: #111827;
+                    font-size: 12px;
+                    line-height: 1.45;
+                }}
+                h1 {{
+                    color: #991b1b;
+                    border-bottom: 2px solid #ef4444;
+                    padding-bottom: 8px;
+                    margin: 0 0 14px;
+                }}
+                h2 {{
+                    margin: 18px 0 8px;
+                    color: #111827;
+                    font-size: 16px;
+                }}
+                h3 {{
+                    background: #f3f4f6;
+                    border-left: 4px solid #ef4444;
+                    padding: 8px 10px;
+                    margin: 18px 0 10px;
+                    font-size: 14px;
+                }}
+                h4 {{
+                    margin: 12px 0 6px;
+                    color: #374151;
+                    font-size: 12px;
+                    text-transform: uppercase;
+                }}
+                table {{
+                    width: 100%;
+                    border-collapse: collapse;
+                    margin: 6px 0 12px;
+                    page-break-inside: avoid;
+                }}
+                th, td {{
+                    border: 1px solid #e5e7eb;
+                    padding: 6px 7px;
+                    vertical-align: top;
+                }}
+                th {{
+                    background: #f9fafb;
+                    color: #374151;
+                    font-weight: 700;
+                    text-align: left;
+                }}
+                .summary-table th {{
+                    width: 22%;
+                }}
+                .steps-table {{
+                    font-size: 10px;
+                }}
+                .steps-table th {{
+                    background: #fee2e2;
+                }}
+                .header-grid {{
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: 10px;
+                    margin-bottom: 12px;
+                }}
+                .info-box {{
+                    border: 1px solid #e5e7eb;
+                    background: #f9fafb;
+                    padding: 10px;
+                    border-radius: 6px;
+                }}
+                .info-box span {{
+                    display: block;
+                    color: #6b7280;
+                    font-size: 10px;
+                    text-transform: uppercase;
+                    font-weight: 700;
+                    margin-bottom: 3px;
+                }}
+                .info-box strong {{
+                    font-size: 13px;
+                }}
+                .badge {{
+                    display: inline-block;
+                    padding: 2px 7px;
+                    border-radius: 999px;
+                    font-size: 10px;
+                    font-weight: 700;
+                    white-space: nowrap;
+                }}
+                .badge-ok {{
+                    color: #047857;
+                    background: #d1fae5;
+                    border: 1px solid #86efac;
+                }}
+                .badge-danger {{
+                    color: #991b1b;
+                    background: #fee2e2;
+                    border: 1px solid #fecaca;
+                }}
+                .badge-muted {{
+                    color: #4b5563;
+                    background: #f3f4f6;
+                    border: 1px solid #d1d5db;
+                }}
+                .alerts {{
+                    border: 1px solid #fecaca;
+                    background: #fff7ed;
+                    padding: 10px;
+                    border-radius: 6px;
+                    margin: 12px 0;
+                }}
+                .alerts ul {{
+                    margin: 6px 0 0 18px;
+                    padding: 0;
+                }}
+                .part-section {{
+                    page-break-inside: avoid;
+                    margin-top: 14px;
+                }}
+                .attachments-list {{
+                    margin: 0 0 10px 18px;
+                    padding: 0;
+                }}
+                .attachments-list li {{
+                    margin-bottom: 4px;
+                }}
+                .muted {{
+                    color: #6b7280;
+                    font-size: 10px;
+                    margin-left: 6px;
+                }}
+                .empty-cell {{
+                    color: #6b7280;
+                    font-style: italic;
+                    text-align: center;
+                }}
+                .footer {{
+                    margin-top: 20px;
+                    padding-top: 8px;
+                    border-top: 1px solid #e5e7eb;
+                    color: #6b7280;
+                    font-size: 10px;
+                    text-align: center;
+                }}
             </style>
         </head>
         <body>
-            <h1>Zlecenie: {order.order_number}</h1>
-            <p><strong>Klient:</strong> {order.client_name}</p>
-            <p><strong>Termin:</strong> {order.date_deadline.strftime('%Y-%m-%d') if order.date_deadline else '-'}</p>
-            <hr>
+            <h1>Karta zlecenia: {escape(order.order_number)}</h1>
+
+            <div class="header-grid">
+                <div class="info-box">
+                    <span>Klient</span>
+                    <strong>{escape(order.client_name or "-")}</strong>
+                </div>
+                <div class="info-box">
+                    <span>Status zlecenia</span>
+                    <strong>{escape(status_text(order.status))}</strong>
+                </div>
+                <div class="info-box">
+                    <span>Operator główny</span>
+                    <strong>{escape(order.operator or "-")}</strong>
+                </div>
+                <div class="info-box">
+                    <span>Kontrola jakości</span>
+                    <strong>{yes_no(order.is_approved)}</strong>
+                </div>
+                <div class="info-box">
+                    <span>Data przyjęcia</span>
+                    <strong>{format_date(order.date_received)}</strong>
+                </div>
+                <div class="info-box">
+                    <span>Termin realizacji</span>
+                    <strong>{format_date(order.date_deadline)}</strong>
+                </div>
+            </div>
+
+            <div class="alerts">
+                <strong>Braki i poprawki:</strong>
+                <p>Poprawka jakościowa: {correction_html}</p>
+                <p>Braki materiałowe:</p>
+                <ul>{missing_parts_html}</ul>
+            </div>
+
             {parts_html}
+
+            <div class="footer">
+                Wygenerowano automatycznie w WeldERP: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+            </div>
         </body>
     </html>
     """
@@ -1017,8 +1416,55 @@ def toggle_step_status(step_id: int, db: Session = Depends(database.get_db)):
         raise HTTPException(status_code=404, detail="Krok nie istnieje")
 
     step.is_completed = not step.is_completed
+    if step.is_completed:
+        step.completed_at = datetime.utcnow()
+        step.completed_by = step.completed_by or step.operator
+    else:
+        step.completed_at = None
+        step.completed_by = None
     db.commit()
-    return {"is_completed": step.is_completed}
+    return {"is_completed": step.is_completed, "completed_at": step.completed_at, "completed_by": step.completed_by}
+
+@app.put("/steps/{step_id}/production-record")
+def update_step_production_record(
+    step_id: int,
+    record: StepProductionRecord,
+    db: Session = Depends(database.get_db)
+):
+    step = db.query(models.ProcessStep).filter(models.ProcessStep.id == step_id).first()
+    if not step:
+        raise HTTPException(status_code=404, detail="Krok nie istnieje")
+
+    if record.material_quantity is not None and record.material_quantity < 0:
+        raise HTTPException(status_code=400, detail="Ilość materiału nie może być ujemna")
+
+    step.is_completed = record.is_completed
+    step.completed_by = record.completed_by.strip() if record.completed_by else None
+    step.production_notes = record.production_notes.strip() if record.production_notes else None
+    step.material_used = record.material_used.strip() if record.material_used else None
+    step.material_quantity = record.material_quantity
+    step.material_unit = record.material_unit.strip() if record.material_unit else None
+
+    if record.is_completed:
+        step.completed_at = step.completed_at or datetime.utcnow()
+        step.completed_by = step.completed_by or step.operator
+    else:
+        step.completed_at = None
+        step.completed_by = None
+
+    db.commit()
+    db.refresh(step)
+
+    return {
+        "id": step.id,
+        "is_completed": step.is_completed,
+        "completed_at": step.completed_at,
+        "completed_by": step.completed_by,
+        "production_notes": step.production_notes,
+        "material_used": step.material_used,
+        "material_quantity": step.material_quantity,
+        "material_unit": step.material_unit,
+    }
 
 @app.get("/operators/")
 def get_operators(db: Session = Depends(database.get_db)):

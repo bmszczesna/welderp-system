@@ -196,6 +196,28 @@
 			).join('');
 		}
 
+		function escapeHtml(value) {
+			return String(value ?? "")
+				.replace(/&/g, "&amp;")
+				.replace(/</g, "&lt;")
+				.replace(/>/g, "&gt;")
+				.replace(/"/g, "&quot;")
+				.replace(/'/g, "&#039;");
+		}
+
+		function formatDateTime(value) {
+			if (!value) return "Nie wykonano";
+			const date = new Date(value);
+			if (Number.isNaN(date.getTime())) return "Nie wykonano";
+			return date.toLocaleString("pl-PL", {
+				year: "numeric",
+				month: "2-digit",
+				day: "2-digit",
+				hour: "2-digit",
+				minute: "2-digit"
+			});
+		}
+
 		function showMessage(text, type = "info") {
 			const el = document.getElementById("message");
 			if (messageTimer) {
@@ -265,20 +287,56 @@
 								${materialActionHtml}
 							</div>
 							<ol class="modal-steps-list" style="margin-top: 5px; padding-left: 30px;">
-								${part.steps.map(step => {
-									const checked = step.is_completed ? "checked" : "";
-									const disabled = order.status !== 'IN_PROGRESS' ? "disabled" : "";
-									const completedClass = step.is_completed ? "completed" : "";
-									return `
-										<div class="step-item">
-										   <label class="step-check-row">
-											  <input type="checkbox" ${checked} ${disabled} onchange="toggleStep(${step.id}, this)">
-											  <span class="step-text ${completedClass}">${step.step_name}</span>
-											  <span class="step-operator">👤 ${step.operator || 'Brak'}</span>
-										   </label>
-										</div>
-									`;
-								}).join('')}
+									${part.steps.map(step => {
+										const checked = step.is_completed ? "checked" : "";
+										const disabled = order.status !== 'IN_PROGRESS' ? "disabled" : "";
+										const completedClass = step.is_completed ? "completed" : "";
+										const completedBy = step.completed_by || step.operator || part.operator || order.operator || "";
+										const materialUsed = step.material_used || part.material || "";
+										const materialQuantity = step.material_quantity ?? "";
+										const materialUnit = step.material_unit || "";
+										const productionNotes = step.production_notes || "";
+										return `
+											<div class="step-item" data-step-id="${step.id}">
+											   <label class="step-check-row">
+												  <input type="checkbox" class="step-complete-checkbox" ${checked} ${disabled} onchange="saveStepProductionRecord(${step.id}, this.closest('.step-item'))">
+												  <span class="step-text ${completedClass}">${escapeHtml(step.step_name)}</span>
+												  <span class="step-operator">Operator: ${escapeHtml(step.operator || 'Brak')}</span>
+											   </label>
+											   <div class="production-record">
+												  <div class="production-record-head">
+													 <strong>Rejestr produkcji</strong>
+													 <span>${escapeHtml(formatDateTime(step.completed_at))}</span>
+												  </div>
+												  <div class="production-grid">
+													 <label>
+														Potwierdził
+														<input type="text" class="step-completed-by" value="${escapeHtml(completedBy)}" ${disabled}>
+													 </label>
+													 <label>
+														Materiał użyty
+														<input type="text" class="step-material-used" value="${escapeHtml(materialUsed)}" ${disabled}>
+													 </label>
+													 <label>
+														Ilość
+														<input type="number" min="0" step="0.01" class="step-material-quantity" value="${escapeHtml(materialQuantity)}" ${disabled}>
+													 </label>
+													 <label>
+														Jedn.
+														<input type="text" class="step-material-unit" value="${escapeHtml(materialUnit)}" placeholder="kg / szt." ${disabled}>
+													 </label>
+												  </div>
+												  <label class="production-notes-label">
+													 Uwagi
+													 <textarea class="step-production-notes" rows="2" ${disabled}>${escapeHtml(productionNotes)}</textarea>
+												  </label>
+												  ${order.status === 'IN_PROGRESS' ? `
+													 <button type="button" class="btn production-save-btn" onclick="saveStepProductionRecord(${step.id}, this.closest('.step-item'))">Zapisz wpis</button>
+												  ` : ""}
+											   </div>
+											</div>
+										`;
+									}).join('')}
 							</ol>
 						</li>`;
 				});
@@ -409,6 +467,13 @@
 	function addStepToEditUI(container, step = {}) {
 		const stepEl = document.createElement('div');
 		stepEl.className = 'edit-step-item';
+		stepEl.dataset.isCompleted = step.is_completed ? "true" : "false";
+		stepEl.dataset.completedBy = step.completed_by || "";
+		stepEl.dataset.completedAt = step.completed_at || "";
+		stepEl.dataset.productionNotes = step.production_notes || "";
+		stepEl.dataset.materialUsed = step.material_used || "";
+		stepEl.dataset.materialQuantity = step.material_quantity ?? "";
+		stepEl.dataset.materialUnit = step.material_unit || "";
 		stepEl.style.display = 'grid';
 		stepEl.style.gridTemplateColumns = '72px minmax(160px, 2fr) minmax(140px, 1fr) auto';
 		stepEl.style.gap = '8px';
@@ -479,7 +544,14 @@
 
 				part.steps.push({
 					step_name: stepName,
-					operator: sRow.querySelector('.edit-step-operator').value || null
+					operator: sRow.querySelector('.edit-step-operator').value || null,
+					is_completed: sRow.dataset.isCompleted === "true",
+					completed_by: sRow.dataset.completedBy || null,
+					completed_at: sRow.dataset.completedAt || null,
+					production_notes: sRow.dataset.productionNotes || null,
+					material_used: sRow.dataset.materialUsed || null,
+					material_quantity: sRow.dataset.materialQuantity === "" ? null : Number(sRow.dataset.materialQuantity),
+					material_unit: sRow.dataset.materialUnit || null
 				});
 			});
 			
@@ -573,9 +645,12 @@
 			const missingMaterialHtml = hasMissingMaterial ? `<p class="card-alert">Brak materiału</p>` : '';
 			const needsCorrectionHtml = needsCorrection ? `<p class="card-alert correction-alert">Do poprawy - priorytet</p>` : '';
 
-			let approveBtnHtml = '';
-			if (order.status === "QUALITY_CHECK" && !order.is_approved) {
-				approveBtnHtml = `<button class="btn btn-success-card" onclick="approveOrder(event, ${order.id})">Zatwierdź jakość</button>`;
+			let qualityActionsHtml = '';
+			if (order.status === "QUALITY_CHECK") {
+				qualityActionsHtml = `
+					${!order.is_approved ? `<button class="btn btn-success-card" onclick="approveOrder(event, ${order.id})">Zatwierdź jakość</button>` : ""}
+					<button class="btn btn-correction-card" onclick="markNeedsCorrection(${order.id}, event)">Do poprawy</button>
+				`;
 			}
 
 			card.innerHTML = `
@@ -585,7 +660,7 @@
                 <p class="order-deadline">${deadlineStr}</p>
 				${missingMaterialHtml}
 				${needsCorrectionHtml}
-				${approveBtnHtml}
+				${qualityActionsHtml}
                  ${order.status === "COMPLETED" ? `
                 <button class="archive-btn-large" style="margin-top:10px;width:100%;"
                     onclick="archiveOrder(event, ${order.id})">
@@ -807,14 +882,15 @@
 		}
 	}
 
-	async function markNeedsCorrection(orderId) {
+	async function markNeedsCorrection(orderId, event = null) {
+		if (event) event.stopPropagation();
 		if (!orderId) return;
 
 		try {
 			const res = await fetch(`/orders/${orderId}/needs-correction`, { method: "PUT" });
 			if (!res.ok) throw new Error();
 
-			showMessage("Zlecenie wróciło do realizacji", "success");
+			showMessage("Zlecenie wróciło do oczekujących", "success");
 			closeModal();
 			await loadOrders();
 		} catch (e) {
@@ -837,18 +913,63 @@
 		}
 	}
 
-	async function toggleStep(stepId, checkbox) {
-		const textSpan = checkbox.nextElementSibling;
-		try {
-			const res = await fetch(`/steps/${stepId}/toggle`, { method: "PUT" });
-			if (res.ok) {
-				textSpan.classList.toggle("completed");
+		async function toggleStep(stepId, checkbox) {
+			const textSpan = checkbox.nextElementSibling;
+			try {
+				const res = await fetch(`/steps/${stepId}/toggle`, { method: "PUT" });
+				if (res.ok) {
+					textSpan.classList.toggle("completed");
+				}
+			} catch (err) {
+				alert("Błąd zapisu statusu");
+				checkbox.checked = !checkbox.checked;
 			}
-		} catch (err) {
-			alert("Błąd zapisu statusu");
-			checkbox.checked = !checkbox.checked;
 		}
-	}
+
+		async function saveStepProductionRecord(stepId, stepItem) {
+			if (!stepItem) return;
+
+			const checkbox = stepItem.querySelector('.step-complete-checkbox');
+			const quantityInput = stepItem.querySelector('.step-material-quantity');
+			const quantityValue = quantityInput.value.trim();
+			const materialQuantity = quantityValue === "" ? null : Number(quantityValue);
+
+			if (quantityValue !== "" && Number.isNaN(materialQuantity)) {
+				showMessage("Ilość materiału musi być liczbą", "error");
+				return;
+			}
+
+			const payload = {
+				is_completed: checkbox.checked,
+				completed_by: stepItem.querySelector('.step-completed-by').value.trim() || null,
+				production_notes: stepItem.querySelector('.step-production-notes').value.trim() || null,
+				material_used: stepItem.querySelector('.step-material-used').value.trim() || null,
+				material_quantity: materialQuantity,
+				material_unit: stepItem.querySelector('.step-material-unit').value.trim() || null
+			};
+
+			try {
+				const res = await fetch(`/steps/${stepId}/production-record`, {
+					method: "PUT",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(payload)
+				});
+
+				if (!res.ok) throw new Error();
+
+				showMessage("Wpis produkcyjny zapisany", "success");
+				await loadOrders();
+				if (currentOpenOrderId) {
+					openModal(currentOpenOrderId);
+				}
+			} catch (err) {
+				showMessage("Nie udało się zapisać wpisu produkcyjnego", "error");
+				await loadOrders();
+				if (currentOpenOrderId) {
+					openModal(currentOpenOrderId);
+				}
+			}
+		}
 
 	async function deletePdf(pdfId, element) {
 		if (!confirm("Czy na pewno chcesz usunąć ten plik?")) return;

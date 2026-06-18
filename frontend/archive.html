@@ -93,7 +93,7 @@
 <div id="archiveModal"
      class="modal-overlay">
 
-    <div class="modal-box">
+    <div class="modal-box archive-modal-box">
 
         <span class="modal-close"
               onclick="closeArchiveModal()">
@@ -101,13 +101,35 @@
             &times;
         </span>
 
-        <div id="archiveModalContent"></div>
+        <div id="archiveModalContent" class="archive-modal-content"></div>
 
     </div>
 
 </div>
 
 <script>
+
+function escapeHtml(value) {
+    return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+function formatDateTime(value) {
+    if (!value) return "Nie wykonano";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "Nie wykonano";
+    return date.toLocaleString("pl-PL", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+    });
+}
 
 async function loadArchive() {
 
@@ -396,16 +418,64 @@ function openArchiveModal(orderId) {
                             ">
 
                                 <div style="
-                                    display: flex;
-                                    justify-content: space-between;
-                                    align-items: center;
-                                    gap: 15px;
-                                    flex-wrap: wrap;
+                                    display: grid;
+                                    gap: 8px;
+                                    padding: 10px;
+                                    border: 1px solid #e5e7eb;
+                                    border-radius: 8px;
+                                    background: #ffffff;
                                 ">
 
-                                    <span>
-                                        ${step.step_name}
-                                    </span>
+                                    <div style="
+                                        display: flex;
+                                        justify-content: space-between;
+                                        align-items: center;
+                                        gap: 15px;
+                                        flex-wrap: wrap;
+                                    ">
+
+                                        <span>
+                                            ${escapeHtml(step.step_name)}
+                                        </span>
+
+                                        <span style="
+                                            font-size: 12px;
+                                            color: ${step.is_completed ? "#047857" : "#6b7280"};
+                                            font-weight: 700;
+                                        ">
+                                            ${step.is_completed ? "Wykonano" : "Nie wykonano"}
+                                        </span>
+
+                                    </div>
+
+                                    <div style="
+                                        display: grid;
+                                        grid-template-columns: repeat(2, minmax(140px, 1fr));
+                                        gap: 6px 12px;
+                                        font-size: 12px;
+                                        color: #4b5563;
+                                    ">
+
+                                        <span><strong>Operator:</strong> ${escapeHtml(step.operator || "Brak")}</span>
+                                        <span><strong>Potwierdził:</strong> ${escapeHtml(step.completed_by || "Brak")}</span>
+                                        <span><strong>Data wykonania:</strong> ${escapeHtml(formatDateTime(step.completed_at))}</span>
+                                        <span><strong>Materiał:</strong> ${escapeHtml(step.material_used || part.material || "Brak")}</span>
+                                        <span><strong>Ilość:</strong> ${
+                                            step.material_quantity !== null && step.material_quantity !== undefined
+                                            ? `${escapeHtml(step.material_quantity)} ${escapeHtml(step.material_unit || "")}`
+                                            : "Brak"
+                                        }</span>
+                                        <span><strong>Uwagi:</strong> ${escapeHtml(step.production_notes || "Brak")}</span>
+
+                                    </div>
+
+                                    <div style="
+                                        display: flex;
+                                        justify-content: flex-end;
+                                        align-items: center;
+                                        gap: 15px;
+                                        flex-wrap: wrap;
+                                    ">
 
                                     ${
                                         step.pdf_path
@@ -430,6 +500,8 @@ function openArchiveModal(orderId) {
                                         `
                                     }
 
+                                    </div>
+
                                 </div>
 
                             </li>
@@ -448,7 +520,7 @@ function openArchiveModal(orderId) {
 
             document.getElementById(
                 "archiveModal"
-            ).style.display = "block";
+            ).style.display = "flex";
         });
 }
 

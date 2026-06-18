@@ -13,9 +13,10 @@ from backend.models import OrderStatus
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from weasyprint import HTML
+from dotenv import load_dotenv
 import io
 import google.generativeai as genai
-
+load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 
 if not api_key:

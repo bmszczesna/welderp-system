@@ -1,97 +1,120 @@
 # WeldERP System
 
-WeldERP System is a simple ERP-style web application for managing production orders in a welding company.
-
-The project was created to support order registration, production flow control, and order status tracking.
+**WeldERP System** is a simple ERP-style web application designed for managing production orders in a welding company. This project was created to streamline order registration, control the production flow, and efficiently track order statuses.
 
 ---
 
-# Technologies Used
+## Main Features
 
-- Python 3.11
-- FastAPI
-- PostgreSQL
-- SQLAlchemy
-- Docker
-- Docker Compose
-- HTML
-- CSS
-- JavaScript
+### Backend API (REST)
+The backend handles business logic and database interactions, providing endpoints for:
+- Creating new production orders
+- Displaying a list of all orders
+- Fetching details of a single order
+- Updating the status of an order
+- Deleting orders
 
----
-
-# Main Features
-
-## Backend API
-
-The application provides REST API endpoints for:
-
-- creating new orders
-- displaying all orders
-- displaying a single order
-- updating order status
-- deleting orders
-
-## Frontend Interface
-
-The web interface allows users to:
-
-- add new production orders
-- view all orders
-- update order status
-- delete orders
-- refresh the order list
+### Frontend Interface
+The web interface is user-friendly and allows operators to:
+- Add new production orders via forms
+- View all active and historical orders
+- Update order statuses seamlessly
+- Delete canceled or erroneous orders
+- Refresh the order list in real-time
 
 ---
 
-# Order Data Structure
+## Technologies Used
 
-Each order contains:
-
-- order number
-- client name
-- production deadline
-- current status
-- list of parts
+- **Backend:** Python 3.11, FastAPI, Uvicorn
+- **Database:** PostgreSQL, SQLAlchemy (ORM)
+- **Frontend:** HTML5, CSS3, JavaScript (Vanilla)
+- **Infrastructure:** Docker, Docker Compose
 
 ---
 
-# Available Order Statuses
+## How to Run the Application
 
-- `IN_QUEUE` – waiting in queue
-- `IN_PROGRESS` – currently in production
-- `COMPLETED` – finished
+The project is fully containerized, making it incredibly easy to set up and run using Docker.
+
+### Prerequisites
+Make sure you have the following installed on your machine:
+- [Docker](https://docs.docker.com/get-docker/)
+- [Docker Compose](https://docs.docker.com/compose/install/)
+- [Git](https://git-scm.com/downloads)
+
+### Step-by-Step Setup
+
+**1. Clone the repository**
+```bash
+git clone https://github.com/bmszczesna/welderp-system.git
+cd welderp-system
+```
+
+**2. Build and start the containers**
+
+Run the following command in the root directory (where `docker-compose.yml` is located). This will pull the necessary images, build the backend, and start the database and web server.
+```bash
+docker compose up --build
+```
+*(Note: Use `docker-compose up --build` if you are on an older version of Docker Compose)*
+
+
+
+**3. Stop the application**
+
+To stop the application and shut down the containers, press `CTRL+C` in the terminal, or run:
+```bash
+docker compose down
+```
 
 ---
 
-# Application URLs
+## Application URLs
 
-## Frontend
+Once the containers are running, you can access the application via your browser:
 
-http://localhost:8000
+- **Frontend Interface:** [http://localhost:8000](http://localhost:8000)
+- **Interactive API Documentation (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
 
-## API Documentation (Swagger UI)
-
-http://localhost:8000/docs
 
 ---
 
-# Project Structure
+## System Logic
 
-```text id="kg2l03"
+### Order Data Structure
+Every order registered in the system contains the following key attributes:
+- **Order Number** (Unique identifier)
+- **Client Name**
+- **Production Deadline**
+- **Current Status**
+- **List of Parts** (Items included in the order)
+
+### Available Order Statuses
+The production flow is controlled through the following statuses:
+- `IN_QUEUE` – Waiting in the queue to be assigned.
+- `IN_PROGRESS` – Currently in production/welding.
+- `COMPLETED` – Finished and ready for delivery/quality check.
+
+---
+
+## Project Structure
+
+```text
 welderp-system/
 │
 ├── backend/
-│   ├── main.py
-│   ├── models.py
-│   ├── database.py
-│   ├── requirements.txt
-│   └── Dockerfile
+│   ├── main.py            
+│   ├── models.py          
+│   ├── database.py        
+│   ├── requirements.txt   
+│   └── Dockerfile         
 │
 ├── frontend/
-│   └── index.html
+│   └── index.html         
 │
-├── tests/
+├── tests/                 
 │
-├── docker-compose.yml
-└── README.md
+├── docker-compose.yml     
+└── README.md              
+```

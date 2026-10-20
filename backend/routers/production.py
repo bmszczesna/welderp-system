@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from backend import database, models, order_service as service
 from backend.models import OrderStatus
-from backend.schemas import StepCompletion, StepProductionRecord
+from backend.schemas import PartMaterialUsage, StepCompletion, StepProductionRecord
 
 router = APIRouter()
 
@@ -55,6 +55,24 @@ def completion_response(step):
     return {"is_completed": step.is_completed, "completed_at": step.completed_at,
             "completed_by": step.completed_by, "order_status": order.status.value,
             "is_approved": order.is_approved}
+
+
+@router.put("/parts/{part_id}/material-usage", tags=["Dane produkcyjne"])
+def part_material_usage(part_id: int, usage: PartMaterialUsage, db: Session = Depends(database.get_db)):
+    part = db.get(models.OrderPart, part_id)
+    if part is None:
+        raise HTTPException(status_code=404, detail="Nie znaleziono części")
+    order = part.owner
+    service.editable(order)
+    service.ensure_material_available(order)
+    if order.status != OrderStatus.IN_PROGRESS:
+        raise HTTPException(status_code=400, detail="Zużycie materiału zapisuje się podczas realizacji zlecenia")
+    if usage.material_quantity is not None and not part.material:
+        raise HTTPException(status_code=422, detail="Podaj materiał części przed zapisaniem zużycia")
+    part.material_quantity, part.material_unit = usage.material_quantity, usage.material_unit
+    service.commit(db)
+    return {"message": "Zużycie materiału zapisane", "part_id": part.id,
+            "material_quantity": part.material_quantity, "material_unit": part.material_unit}
 
 
 @router.put("/steps/{step_id}/completion", tags=["Dane produkcyjne"])

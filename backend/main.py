@@ -118,6 +118,11 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
 
     parts_html = ""
     for part_index, part in enumerate(order.parts, start=1):
+        part_quantity = (
+            f"{part.material_quantity:g} {escape(part.material_unit or '')}".strip()
+            if part.material_quantity is not None
+            else "-"
+        )
         attachment_html = (
             "".join(
                 f"""
@@ -135,13 +140,6 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
         steps_rows = ""
         for step in part.steps:
             step_status = "Wykonany" if step.is_completed else "Niewykonany"
-            quantity = (
-                f"{step.material_quantity:g} {escape(step.material_unit or '')}".strip()
-                if step.material_quantity is not None
-                else "-"
-            )
-            material = escape(step.material_used or part.material or "-")
-            notes = escape(step.production_notes or "-")
 
             steps_rows += f"""
                 <tr>
@@ -152,18 +150,14 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
                             {step_status}
                         </span>
                     </td>
-                    <td>{escape(step.completed_by or "-")}</td>
                     <td>{format_datetime(step.completed_at)}</td>
-                    <td>{material}</td>
-                    <td>{quantity}</td>
-                    <td>{notes}</td>
                 </tr>
             """
 
         if not steps_rows:
             steps_rows = """
                 <tr>
-                    <td colspan="8" class="empty-cell">Brak kroków technologicznych dla tej części</td>
+                    <td colspan="4" class="empty-cell">Brak kroków technologicznych dla tej części</td>
                 </tr>
             """
 
@@ -180,14 +174,14 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
                     <tr>
                         <th>Materiał</th>
                         <td>{escape(part.material or "-")}</td>
-                        <th>Status materiału</th>
-                        <td>{material_status}</td>
+                        <th>Zużyta ilość</th>
+                        <td>{part_quantity}</td>
                     </tr>
                     <tr>
+                        <th>Status materiału</th>
+                        <td>{material_status}</td>
                         <th>Operator części</th>
                         <td>{escape(part.operator or "-")}</td>
-                        <th>Liczba kroków</th>
-                        <td>{len(part.steps)}</td>
                     </tr>
                 </table>
 
@@ -198,11 +192,7 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
                             <th>Krok</th>
                             <th>Operator</th>
                             <th>Status</th>
-                            <th>Potwierdził</th>
                             <th>Data wykonania</th>
-                            <th>Materiał użyty</th>
-                            <th>Ilość</th>
-                            <th>Uwagi</th>
                         </tr>
                     </thead>
                     <tbody>

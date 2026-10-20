@@ -144,7 +144,10 @@ def build_order(index, spec, reference):
             if spec.missing and not is_completed:
                 record["production_notes"] = "Dane demonstracyjne. Oczekiwanie na dostawę materiału."
             records.append(record)
-        parts.append({"part_name": name, "material": material, "operator": part_operator, "steps": records})
+        material_recorded = part_index * 3 in completed_indices
+        parts.append({"part_name": name, "material": material, "operator": part_operator, "steps": records,
+                      "material_quantity": quantity if material_recorded else None,
+                      "material_unit": unit if material_recorded else None})
 
     # Use the same field and unit validation as the real API.
     payload = OrderCreate(

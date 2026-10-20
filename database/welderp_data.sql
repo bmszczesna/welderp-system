@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict GfuSwIHrQETiUP5oGpltrXJR7e2ubqVEWPLxLPIFnx6463eokjUZI6vvo9r8VoA
+\restrict f4ZyHTF3gL7cydo6zzNuGsKFfpePJlhJxdsAhlSNEJpx0NsdUJ0EG6UTwccpE3a
 
 -- Dumped from database version 15.19
 -- Dumped by pg_dump version 15.19
@@ -70,50 +70,50 @@ INSERT INTO public.orders (id, order_number, client_name, date_received, date_de
 -- Data for Name: order_parts; Type: TABLE DATA; Schema: public; Owner: -
 --
 
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (1, 'drzwi', 'metal', false, 1, 'Jakub Mazur', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (3, 'Szafa', 'metal', true, 3, 'Jakub Mazur', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (4, 'hgghg', 'jhgfdfghj', false, 4, 'Jakub Mazur', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (2, 'Brama', NULL, false, 2, 'Jan Nowak', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (5, 'Rama nośna', 'S235JR', false, 5, 'Jan Majewski (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (6, 'Wspornik montażowy', 'S235JR', false, 5, 'Piotr Kowalik (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (7, 'Balustrada', 'AISI 304', true, 6, 'Piotr Kowalik (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (8, 'Płyta mocująca', 'AISI 304', false, 6, 'Tomasz Baran (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (9, 'Segment ogrodzenia', 'S355', false, 7, 'Tomasz Baran (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (10, 'Słupek nośny', 'S235JR', false, 7, 'Marek Kurek (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (11, 'Podstawa maszyny', 'S355', false, 8, 'Marek Kurek (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (12, 'Uchwyt mocujący', 'S235JR', false, 8, 'Anna Wrona (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (13, 'Rama nośna', 'S235JR', false, 9, 'Anna Wrona (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (14, 'Wspornik montażowy', 'S235JR', false, 9, 'Katarzyna Lis (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (15, 'Balustrada', 'AISI 304', false, 10, 'Katarzyna Lis (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (16, 'Płyta mocująca', 'AISI 304', false, 10, 'Adam Sobczak (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (17, 'Segment ogrodzenia', 'S355', false, 11, 'Adam Sobczak (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (18, 'Słupek nośny', 'S235JR', false, 11, 'Ewa Wilk (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (19, 'Podstawa maszyny', 'S355', false, 12, 'Ewa Wilk (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (20, 'Uchwyt mocujący', 'S235JR', false, 12, 'Jan Majewski (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (21, 'Rama nośna', 'S235JR', false, 13, 'Jan Majewski (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (22, 'Wspornik montażowy', 'S235JR', false, 13, 'Piotr Kowalik (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (23, 'Balustrada', 'AISI 304', false, 14, 'Piotr Kowalik (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (24, 'Płyta mocująca', 'AISI 304', false, 14, 'Tomasz Baran (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (25, 'Segment ogrodzenia', 'S355', false, 15, 'Tomasz Baran (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (26, 'Słupek nośny', 'S235JR', false, 15, 'Marek Kurek (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (27, 'Podstawa maszyny', 'S355', false, 16, 'Marek Kurek (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (28, 'Uchwyt mocujący', 'S235JR', false, 16, 'Anna Wrona (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (29, 'Rama nośna', 'S235JR', false, 17, 'Anna Wrona (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (30, 'Wspornik montażowy', 'S235JR', false, 17, 'Katarzyna Lis (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (31, 'Balustrada', 'AISI 304', false, 18, 'Katarzyna Lis (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (32, 'Płyta mocująca', 'AISI 304', false, 18, 'Adam Sobczak (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (33, 'Segment ogrodzenia', 'S355', false, 19, 'Adam Sobczak (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (34, 'Słupek nośny', 'S235JR', false, 19, 'Ewa Wilk (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (35, 'Podstawa maszyny', 'S355', false, 20, 'Ewa Wilk (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (36, 'Uchwyt mocujący', 'S235JR', false, 20, 'Jan Majewski (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (37, 'Rama nośna', 'S235JR', false, 21, 'Jan Majewski (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (38, 'Wspornik montażowy', 'S235JR', false, 21, 'Piotr Kowalik (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (39, 'Balustrada', 'AISI 304', false, 22, 'Piotr Kowalik (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (40, 'Płyta mocująca', 'AISI 304', false, 22, 'Tomasz Baran (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (41, 'Segment ogrodzenia', 'S355', false, 23, 'Tomasz Baran (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (42, 'Słupek nośny', 'S235JR', false, 23, 'Marek Kurek (DEMO)', 1) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (43, 'Podstawa maszyny', 'S355', false, 24, 'Marek Kurek (DEMO)', 0) ON CONFLICT DO NOTHING;
-INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position") VALUES (44, 'Uchwyt mocujący', 'S235JR', false, 24, 'Anna Wrona (DEMO)', 1) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (1, 'drzwi', 'metal', false, 1, 'Jakub Mazur', 0, NULL, NULL) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (3, 'Szafa', 'metal', true, 3, 'Jakub Mazur', 0, NULL, NULL) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (4, 'hgghg', 'jhgfdfghj', false, 4, 'Jakub Mazur', 0, NULL, NULL) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (2, 'Brama', NULL, false, 2, 'Jan Nowak', 0, NULL, NULL) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (5, 'Rama nośna', 'S235JR', false, 5, 'Jan Majewski (DEMO)', 0, NULL, NULL) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (6, 'Wspornik montażowy', 'S235JR', false, 5, 'Piotr Kowalik (DEMO)', 1, NULL, NULL) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (8, 'Płyta mocująca', 'AISI 304', false, 6, 'Tomasz Baran (DEMO)', 1, NULL, NULL) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (11, 'Podstawa maszyny', 'S355', false, 8, 'Marek Kurek (DEMO)', 0, NULL, NULL) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (12, 'Uchwyt mocujący', 'S235JR', false, 8, 'Anna Wrona (DEMO)', 1, NULL, NULL) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (14, 'Wspornik montażowy', 'S235JR', false, 9, 'Katarzyna Lis (DEMO)', 1, NULL, NULL) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (16, 'Płyta mocująca', 'AISI 304', false, 10, 'Adam Sobczak (DEMO)', 1, NULL, NULL) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (19, 'Podstawa maszyny', 'S355', false, 12, 'Ewa Wilk (DEMO)', 0, NULL, NULL) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (20, 'Uchwyt mocujący', 'S235JR', false, 12, 'Jan Majewski (DEMO)', 1, NULL, NULL) ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (7, 'Balustrada', 'AISI 304', true, 6, 'Piotr Kowalik (DEMO)', 0, 3.2, 'm') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (9, 'Segment ogrodzenia', 'S355', false, 7, 'Tomasz Baran (DEMO)', 0, 2.4, 'm2') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (10, 'Słupek nośny', 'S235JR', false, 7, 'Marek Kurek (DEMO)', 1, 2.1, 'm') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (15, 'Balustrada', 'AISI 304', false, 10, 'Katarzyna Lis (DEMO)', 0, 3.2, 'm') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (17, 'Segment ogrodzenia', 'S355', false, 11, 'Adam Sobczak (DEMO)', 0, 2.4, 'm2') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (18, 'Słupek nośny', 'S235JR', false, 11, 'Ewa Wilk (DEMO)', 1, 2.1, 'm') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (21, 'Rama nośna', 'S235JR', false, 13, 'Jan Majewski (DEMO)', 0, 18.5, 'kg') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (22, 'Wspornik montażowy', 'S235JR', false, 13, 'Piotr Kowalik (DEMO)', 1, 4, 'szt') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (23, 'Balustrada', 'AISI 304', false, 14, 'Piotr Kowalik (DEMO)', 0, 3.2, 'm') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (24, 'Płyta mocująca', 'AISI 304', false, 14, 'Tomasz Baran (DEMO)', 1, 2, 'szt') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (25, 'Segment ogrodzenia', 'S355', false, 15, 'Tomasz Baran (DEMO)', 0, 2.4, 'm2') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (26, 'Słupek nośny', 'S235JR', false, 15, 'Marek Kurek (DEMO)', 1, 2.1, 'm') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (27, 'Podstawa maszyny', 'S355', false, 16, 'Marek Kurek (DEMO)', 0, 32, 'kg') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (28, 'Uchwyt mocujący', 'S235JR', false, 16, 'Anna Wrona (DEMO)', 1, 6, 'szt') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (29, 'Rama nośna', 'S235JR', false, 17, 'Anna Wrona (DEMO)', 0, 18.5, 'kg') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (30, 'Wspornik montażowy', 'S235JR', false, 17, 'Katarzyna Lis (DEMO)', 1, 4, 'szt') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (31, 'Balustrada', 'AISI 304', false, 18, 'Katarzyna Lis (DEMO)', 0, 3.2, 'm') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (32, 'Płyta mocująca', 'AISI 304', false, 18, 'Adam Sobczak (DEMO)', 1, 2, 'szt') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (33, 'Segment ogrodzenia', 'S355', false, 19, 'Adam Sobczak (DEMO)', 0, 2.4, 'm2') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (34, 'Słupek nośny', 'S235JR', false, 19, 'Ewa Wilk (DEMO)', 1, 2.1, 'm') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (35, 'Podstawa maszyny', 'S355', false, 20, 'Ewa Wilk (DEMO)', 0, 32, 'kg') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (36, 'Uchwyt mocujący', 'S235JR', false, 20, 'Jan Majewski (DEMO)', 1, 6, 'szt') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (37, 'Rama nośna', 'S235JR', false, 21, 'Jan Majewski (DEMO)', 0, 18.5, 'kg') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (38, 'Wspornik montażowy', 'S235JR', false, 21, 'Piotr Kowalik (DEMO)', 1, 4, 'szt') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (39, 'Balustrada', 'AISI 304', false, 22, 'Piotr Kowalik (DEMO)', 0, 3.2, 'm') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (40, 'Płyta mocująca', 'AISI 304', false, 22, 'Tomasz Baran (DEMO)', 1, 2, 'szt') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (41, 'Segment ogrodzenia', 'S355', false, 23, 'Tomasz Baran (DEMO)', 0, 2.4, 'm2') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (42, 'Słupek nośny', 'S235JR', false, 23, 'Marek Kurek (DEMO)', 1, 2.1, 'm') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (43, 'Podstawa maszyny', 'S355', false, 24, 'Marek Kurek (DEMO)', 0, 32, 'kg') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (44, 'Uchwyt mocujący', 'S235JR', false, 24, 'Anna Wrona (DEMO)', 1, 6, 'szt') ON CONFLICT DO NOTHING;
+INSERT INTO public.order_parts (id, part_name, material, material_missing, order_id, operator, "position", material_quantity, material_unit) VALUES (13, 'Rama nośna', 'S235JR', false, 9, 'Anna Wrona (DEMO)', 0, 18.5, 'kg') ON CONFLICT DO NOTHING;
 
 
 --
@@ -393,4 +393,4 @@ SELECT pg_catalog.setval('public.process_steps_id_seq', 124, true);
 -- PostgreSQL database dump complete
 --
 
-\unrestrict GfuSwIHrQETiUP5oGpltrXJR7e2ubqVEWPLxLPIFnx6463eokjUZI6vvo9r8VoA
+\unrestrict f4ZyHTF3gL7cydo6zzNuGsKFfpePJlhJxdsAhlSNEJpx0NsdUJ0EG6UTwccpE3a

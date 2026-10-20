@@ -2,10 +2,20 @@
 
 Aplikacja do obsługi zleceń produkcyjnych: części, operacje technologiczne,
 operatorzy, materiały, dokumentacja PDF, kontrola jakości i archiwum.
+Zużycie materiału zapisuje się dla całej części; wykonanie jest oznaczane
+osobno przy każdej operacji.
 Backend: FastAPI i SQLAlchemy. Frontend: HTML, CSS i JavaScript.
 Baza: PostgreSQL w Dockerze lub SQLite przy uruchomieniu lokalnym.
 
 ## Uruchomienie przez Docker Compose
+
+Wymagane są Git oraz działający Docker Desktop z Docker Compose.
+Pobierz aktualną gałąź projektu:
+
+```powershell
+git clone --branch testy https://github.com/bmszczesna/welderp-system.git
+cd welderp-system
+```
 
 ```powershell
 docker compose up --build -d

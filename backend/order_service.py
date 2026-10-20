@@ -105,7 +105,8 @@ def create_order(db, payload):
                                   reason="Utworzenie zlecenia"))
     for index, data in enumerate(payload.parts):
         part = models.OrderPart(part_name=data.part_name, material=data.material,
-                                operator=data.operator, position=index)
+                                operator=data.operator, position=index,
+                                material_quantity=data.material_quantity, material_unit=data.material_unit)
         order.parts.append(part)
         for step_index, step_data in enumerate(data.steps):
             step = models.ProcessStep()
@@ -144,6 +145,11 @@ def update_order(db, order, payload):
             part = models.OrderPart()
         part.part_name, part.material, part.operator, part.position = (
             data.part_name, data.material, data.operator, position)
+        for field in ("material_quantity", "material_unit"):
+            if field in data.model_fields_set:
+                setattr(part, field, getattr(data, field))
+        if part.material_quantity is not None and not part.material:
+            raise HTTPException(status_code=422, detail="Podaj materiał części z zapisaną ilością")
         existing_steps = {step.id: step for step in part.steps}
         updated_steps = []
         for step_position, step_data in enumerate(data.steps):

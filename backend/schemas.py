@@ -51,8 +51,7 @@ class InputModel(BaseModel):
         return value.strip() or None if isinstance(value, str) else value
 
 
-class MaterialRecord(InputModel):
-    material_used: Optional[str] = Field(default=None, max_length=255)
+class MaterialAmount(InputModel):
     material_quantity: Optional[float] = Field(default=None, ge=0, allow_inf_nan=False)
     material_unit: Optional[str] = None
 
@@ -76,6 +75,14 @@ class MaterialRecord(InputModel):
         if (self.material_quantity is None) != (self.material_unit is None):
             raise ValueError("Ilość materiału i jednostkę należy podać razem")
         return self
+
+
+class MaterialRecord(MaterialAmount):
+    material_used: Optional[str] = Field(default=None, max_length=255)
+
+
+class PartMaterialUsage(MaterialAmount):
+    pass
 
 
 class StepCreate(MaterialRecord):
@@ -106,12 +113,18 @@ class StepCompletion(InputModel):
     is_completed: bool
 
 
-class PartCreate(InputModel):
+class PartCreate(MaterialAmount):
     part_name: Name
     material: Optional[str] = Field(default=None, max_length=255)
     operator: Optional[str] = Field(default=None, max_length=255)
     client_key: Optional[str] = Field(default=None, max_length=100)
     steps: list[StepCreate] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def quantity_requires_material(self):
+        if self.material_quantity is not None and not self.material:
+            raise ValueError("Podaj materiał części z zapisaną ilością")
+        return self
 
 
 class PartUpdate(PartCreate):
@@ -195,6 +208,8 @@ class PartResponse(ORMResponse):
     position: int = 0
     material: Optional[str] = None
     material_missing: bool = False
+    material_quantity: Optional[float] = None
+    material_unit: Optional[str] = None
     operator: Optional[str] = None
     steps: list[StepResponse] = Field(default_factory=list)
     pdfs: list[PDFResponse] = Field(default_factory=list)

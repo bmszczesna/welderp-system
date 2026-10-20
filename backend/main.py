@@ -1,514 +1,77 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Response, Request
-from sqlalchemy.orm import Session
-import shutil
-import os
-from pydantic import BaseModel
-from typing import List, Optional
+"""WeldERP API entry point and existing PDF reports.
+
+Order/production validation and transactional writes live in dedicated modules.
+Database upgrades run at application startup, not during module import.
+"""
+from contextlib import asynccontextmanager
 from datetime import datetime
 from html import escape
-from sqlalchemy import text
-from backend import models
-from backend import database
-from backend.models import OrderStatus
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from typing import Optional
+
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from weasyprint import HTML
-from dotenv import load_dotenv
-import io
-import google.generativeai as genai
-load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
-if not api_key:
-    print("BŁĄD: Brak klucza API Gemini w zmiennych środowiskowych!")
-else:
-    genai.configure(api_key=api_key)
+from backend import database, models, settings
+from backend.integrations import HTML, get_ai_model
+from backend.migrations import initialize_database
+from backend.models import OrderStatus
+from backend.routers import orders, production, users
 
-ai_model = genai.GenerativeModel('models/gemini-3-flash-preview')
-models.Base.metadata.create_all(bind=database.engine)
-
-def ensure_missing_columns():
-    with database.engine.begin() as connection:
-        if "sqlite" in database.DATABASE_URL:
-            order_part_columns = {
-                row[1]
-                for row in connection.execute(text("PRAGMA table_info(order_parts)")).fetchall()
-            }
-
-            if "material" not in order_part_columns:
-                connection.execute(text("ALTER TABLE order_parts ADD COLUMN material VARCHAR"))
-
-            if "material_missing" not in order_part_columns:
-                connection.execute(
-                    text("ALTER TABLE order_parts ADD COLUMN material_missing BOOLEAN DEFAULT 0")
-                )
-
-            order_columns = {
-                row[1]
-                for row in connection.execute(text("PRAGMA table_info(orders)")).fetchall()
-            }
-
-            if "needs_correction" not in order_columns:
-                connection.execute(
-                    text("ALTER TABLE orders ADD COLUMN needs_correction BOOLEAN DEFAULT 0")
-                )
-
-            step_columns = {
-                row[1]
-                for row in connection.execute(text("PRAGMA table_info(process_steps)")).fetchall()
-            }
-            sqlite_step_columns = {
-                "completed_at": "DATETIME",
-                "completed_by": "VARCHAR",
-                "production_notes": "TEXT",
-                "material_used": "VARCHAR",
-                "material_quantity": "FLOAT",
-                "material_unit": "VARCHAR",
-            }
-
-            for column_name, column_type in sqlite_step_columns.items():
-                if column_name not in step_columns:
-                    connection.execute(
-                        text(f"ALTER TABLE process_steps ADD COLUMN {column_name} {column_type}")
-                    )
-
-        elif "postgresql" in database.DATABASE_URL:
-            postgres_columns = [
-                "ALTER TABLE order_parts ADD COLUMN IF NOT EXISTS material VARCHAR",
-                "ALTER TABLE order_parts ADD COLUMN IF NOT EXISTS material_missing BOOLEAN DEFAULT false",
-                "ALTER TABLE orders ADD COLUMN IF NOT EXISTS needs_correction BOOLEAN DEFAULT false",
-                "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP",
-                "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS completed_by VARCHAR",
-                "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS production_notes TEXT",
-                "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS material_used VARCHAR",
-                "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS material_quantity DOUBLE PRECISION",
-                "ALTER TABLE process_steps ADD COLUMN IF NOT EXISTS material_unit VARCHAR",
-            ]
-
-            for statement in postgres_columns:
-                connection.execute(text(statement))
-
-ensure_missing_columns()
-
-UPLOAD_DIR = "uploads"
-
-if not os.path.exists(UPLOAD_DIR):
-    os.makedirs(UPLOAD_DIR)
-
-app = FastAPI(title="WeldERP - Order Management API")
-
-app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
-from fastapi.middleware.cors import CORSMiddleware
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-class StepCreate(BaseModel):
-    step_name: str
-    operator: Optional[str] = None
-    is_completed: bool = False
-    completed_by: Optional[str] = None
-    completed_at: Optional[datetime] = None
-    production_notes: Optional[str] = None
-    material_used: Optional[str] = None
-    material_quantity: Optional[float] = None
-    material_unit: Optional[str] = None
-
-class PartCreate(BaseModel):
-    part_name: str
-    material: Optional[str] = None
-    steps: List[StepCreate] = []
-    operator: Optional[str] = None
+settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
-
-class OrderCreate(BaseModel):
-    order_number: str
-    client_name: str
-    date_received: Optional[datetime] = None
-    date_deadline: Optional[datetime] = None
-    operator: Optional[str] = None
-    parts: List[PartCreate] = []
-
-class StepResponse(BaseModel):
-    id: int
-    step_name: str
-    operator: Optional[str] = None
-    is_completed: bool = False
-    completed_by: Optional[str] = None
-    completed_at: Optional[datetime] = None
-    production_notes: Optional[str] = None
-    material_used: Optional[str] = None
-    material_quantity: Optional[float] = None
-    material_unit: Optional[str] = None
-    pdf_path: Optional[str] = None
-    class Config:
-        from_attributes = True
-
-class PartResponse(BaseModel):
-    id: int
-    part_name: str
-    material: Optional[str] = None
-    material_missing: bool = False
-    operator: Optional[str] = None
-    steps: List[StepResponse] = []
-    class Config:
-        from_attributes = True
+@asynccontextmanager
+async def lifespan(app):
+    initialize_database(database.engine)
+    yield
 
 
-
-class OrderResponse(BaseModel):
-    id: int
-    order_number: str
-    client_name: str
-    status: OrderStatus
-    is_approved: bool = False
-    needs_correction: bool = False
-
-    date_received: Optional[datetime] = None
-    date_deadline: Optional[datetime] = None
-
-    operator: Optional[str] = None
-    parts: List[PartResponse]
-
-    class Config:
-        from_attributes = True
+app = FastAPI(title="WeldERP - Order Management API", version="0.3.0", lifespan=lifespan)
+app.include_router(orders.router)
+app.include_router(production.router)
+app.include_router(users.router)
+app.mount("/frontend", StaticFiles(directory=settings.ROOT_DIR / "frontend"), name="frontend")
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
 
+@app.exception_handler(RequestValidationError)
+async def validation_error(request, exc):
+    # Error contexts may contain exceptions/NaN; do not serialize raw inputs.
+    errors = [{"loc": error["loc"], "msg": error["msg"], "type": error["type"]}
+              for error in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": errors})
 
-class StepUpdate(BaseModel):
-    step_name: str
-    operator: Optional[str] = None
-    is_completed: bool = False
-    completed_by: Optional[str] = None
-    completed_at: Optional[datetime] = None
-    production_notes: Optional[str] = None
-    material_used: Optional[str] = None
-    material_quantity: Optional[float] = None
-    material_unit: Optional[str] = None
 
-class StepProductionRecord(BaseModel):
-    is_completed: bool
-    completed_by: Optional[str] = None
-    production_notes: Optional[str] = None
-    material_used: Optional[str] = None
-    material_quantity: Optional[float] = None
-    material_unit: Optional[str] = None
-
-class PartUpdate(BaseModel):
-    part_name: str
-    material: Optional[str] = None
-    operator: Optional[str] = None
-    steps: List[StepCreate] = []
-
-class OrderUpdate(BaseModel):
-    order_number: str
-    client_name: str
-    date_deadline: Optional[datetime] = None
-    operator: Optional[str] = None
-    parts: List[PartUpdate] = []
-
-# --- API Endpoints ---
-
-@app.get("/index.html")
-def serve_index_html():
-    return FileResponse("frontend/index.html")
+@app.get("/health", tags=["Uruchomienie"])
+def health(db: Session = Depends(database.get_db)):
+    db.execute(text("SELECT 1"))
+    return {"status": "ok", "database": "ok"}
 
 
 @app.get("/")
-def serve_kanban():
-    return FileResponse("frontend/login.html")
+def serve_login():
+    return FileResponse(settings.ROOT_DIR / "frontend/login.html")
+
+
+@app.get("/index.html")
+def serve_order_form():
+    return FileResponse(settings.ROOT_DIR / "frontend/index.html")
 
 
 @app.get("/kanban.html")
-def serve_kanban_html(request: Request):
-    if "logged_in" not in request.cookies:
+def serve_kanban(request: Request):
+    if request.cookies.get("logged_in") != "true":
         return RedirectResponse(url="/frontend/login.html")
-    return FileResponse("frontend/kanban.html")
+    return FileResponse(settings.ROOT_DIR / "frontend/kanban.html")
+
 
 @app.get("/archive.html")
-def serve_archive_html():
-    return FileResponse("frontend/archive.html")
-
-
-@app.post("/orders/", status_code=201)
-def create_order(order: OrderCreate, db: Session = Depends(database.get_db)):
-    #
-    db_order = db.query(models.Order).filter(models.Order.order_number == order.order_number).first()
-    if db_order:
-        raise HTTPException(status_code=400, detail="Order number already exists")
-
-
-    new_order = models.Order(
-        order_number=order.order_number,
-        client_name=order.client_name,
-        date_received=order.date_received,
-        date_deadline=order.date_deadline,
-        operator=order.operator
-    )
-    db.add(new_order)
-    db.commit()
-    db.refresh(new_order)
-
-    for part in order.parts:
-        new_part = models.OrderPart(
-            part_name=part.part_name,
-            material=part.material,
-            order_id=new_order.id,
-            operator=part.operator
-        )
-        db.add(new_part)
-        db.flush()
-
-        for step in part.steps:
-            new_step = models.ProcessStep(
-                step_name=step.step_name,
-                part_id=new_part.id,
-                operator=step.operator,
-                is_completed=step.is_completed,
-                completed_at=step.completed_at or (datetime.utcnow() if step.is_completed else None),
-                completed_by=step.completed_by,
-                production_notes=step.production_notes,
-                material_used=step.material_used,
-                material_quantity=step.material_quantity,
-                material_unit=step.material_unit,
-            )
-            db.add(new_step)
-
-    db.commit()
-
-    return {"message": "Order created successfully", "order_id": new_order.id, "order_number": new_order.order_number}
-
-@app.get("/orders/")
-def get_orders(db: Session = Depends(database.get_db)):
-    orders = db.query(models.Order).all()
-
-    result = []
-
-    for o in orders:
-        result.append({
-            "id": o.id,
-            "order_number": o.order_number,
-            "client_name": o.client_name,
-            "date_received": o.date_received,
-            "date_deadline": o.date_deadline,
-            "status": o.status.value if o.status else None,
-            "is_approved": o.is_approved,
-            "needs_correction": o.needs_correction,
-            "operator": o.operator,
-            "parts": [
-                {
-                    "id": p.id,
-                    "part_name": p.part_name,
-                    "material": p.material,
-                    "material_missing": p.material_missing,
-                    "operator": p.operator,
-                    "steps": [
-                        {
-                            "id": s.id,
-                            "step_name": s.step_name,
-                            "operator": s.operator,
-                            "is_completed": s.is_completed,
-                            "completed_by": s.completed_by,
-                            "completed_at": s.completed_at,
-                            "production_notes": s.production_notes,
-                            "material_used": s.material_used,
-                            "material_quantity": s.material_quantity,
-                            "material_unit": s.material_unit
-                        }
-                        for s in p.steps
-                    ],
-                    "pdfs": [{"id": pdf.id, "file_name": pdf.file_name} for pdf in p.pdfs]
-                }
-                for p in o.parts
-            ]
-        })
-
-    return result
-
-
-@app.get("/orders/{order_id}", response_model=OrderResponse)
-def get_order(order_id: int, db: Session = Depends(database.get_db)):
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    return order
-
-@app.put("/orders/{order_id}/status")
-def update_status(order_id: int, status: str, db: Session = Depends(database.get_db)):
-
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    try:
-        order.status = OrderStatus(status)
-    except:
-        raise HTTPException(status_code=400, detail="Invalid status")
-
-    if order.status != OrderStatus.IN_PROGRESS:
-        order.needs_correction = False
-
-    db.commit()
-    db.refresh(order)
-
-    return {"message": "Status updated", "status": order.status.value}
-
-@app.delete("/orders/{order_id}")
-def delete_order(order_id: int, db: Session = Depends(database.get_db)):
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
-
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    db.delete(order)
-    db.commit()
-
-    return {"message": "Order deleted"}
-
-@app.put("/orders/{order_id}/operator")
-def assign_operator(order_id: int, operator_name: str, db: Session = Depends(database.get_db)):
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Nie znaleziono zlecenia")
-    
-    order.operator = operator_name if operator_name != "Brak" else None
-    db.commit()
-    return {"message": "Operator przypisany"}
-
-@app.put("/orders/{order_id}/approve")
-def approve_order(order_id: int, db: Session = Depends(database.get_db)):
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Nie znaleziono zlecenia")
-    
-    order.is_approved = True
-    order.needs_correction = False
-    db.commit()
-    return {"message": "Zlecenie zatwierdzone"}
-
-@app.put("/orders/{order_id}/needs-correction")
-def mark_order_needs_correction(order_id: int, db: Session = Depends(database.get_db)):
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Nie znaleziono zlecenia")
-
-    order.status = OrderStatus.IN_QUEUE
-    order.is_approved = False
-    order.needs_correction = True
-    db.commit()
-    db.refresh(order)
-
-    return {"message": "Zlecenie przeniesione do oczekujących", "status": order.status.value}
-
-@app.put("/parts/{part_id}/material-missing")
-def set_part_material_missing(
-    part_id: int,
-    missing: bool = True,
-    db: Session = Depends(database.get_db)
-):
-    part = db.query(models.OrderPart).filter(models.OrderPart.id == part_id).first()
-    if not part:
-        raise HTTPException(status_code=404, detail="Nie znaleziono czesci")
-
-    part.material_missing = missing
-
-    if missing and part.owner:
-        part.owner.status = OrderStatus.IN_QUEUE
-        part.owner.is_approved = False
-        part.owner.needs_correction = False
-
-    db.commit()
-    db.refresh(part)
-
-    return {
-        "message": "Status materialu zaktualizowany",
-        "part_id": part.id,
-        "material_missing": part.material_missing,
-        "order_status": part.owner.status.value if part.owner and part.owner.status else None
-    }
-
-@app.put("/orders/{order_id}")
-def update_order(order_id: int, order_update: OrderUpdate, db: Session = Depends(database.get_db)):
-    order = db.query(models.Order).filter(models.Order.id == order_id).first()
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-
-    order.order_number = order_update.order_number
-    order.client_name = order_update.client_name
-    order.date_deadline = order_update.date_deadline
-    order.operator = order_update.operator
-
-    for part in order.parts:
-        db.delete(part)
-    db.commit()
-
-    for part in order_update.parts:
-        new_part = models.OrderPart(
-            part_name=part.part_name,
-            material=part.material,
-            order_id=order.id,
-            operator=part.operator
-        )
-        db.add(new_part)
-        db.flush()
-
-        for step in part.steps:
-            new_step = models.ProcessStep(
-                step_name=step.step_name,
-                part_id=new_part.id,
-                operator=step.operator,
-                is_completed=step.is_completed,
-                completed_at=step.completed_at or (datetime.utcnow() if step.is_completed else None),
-                completed_by=step.completed_by,
-                production_notes=step.production_notes,
-                material_used=step.material_used,
-                material_quantity=step.material_quantity,
-                material_unit=step.material_unit,
-            )
-            db.add(new_step)
-    
-    db.commit()
-    db.refresh(order)
-    return {"message": "Order updated successfully"}
-
-
-@app.post("/parts/{part_id}/upload-pdf")
-async def upload_part_pdf(part_id: int, file: UploadFile = File(...), db: Session = Depends(database.get_db)):
-    full_filename = f"{part_id}_{file.filename}"
-    file_path = os.path.join(UPLOAD_DIR, full_filename)
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    new_pdf = models.PartPDF(part_id=part_id, file_path=file_path, file_name=full_filename)
-    db.add(new_pdf)
-    db.commit()
-    db.refresh(new_pdf)
-    return {"message": "Plik dodany", "id": new_pdf.id}
-
-
-@app.delete("/parts/pdf/{pdf_id}")
-async def delete_part_pdf(pdf_id: int, db: Session = Depends(database.get_db)):
-    pdf = db.query(models.PartPDF).filter(models.PartPDF.id == pdf_id).first()
-    if not pdf:
-        raise HTTPException(status_code=404, detail="Plik nie znaleziony")
-
-    if os.path.exists(pdf.file_path):
-        os.remove(pdf.file_path)
-
-    db.delete(pdf)
-    db.commit()
-    return {"message": "Plik usunięty"}
+def serve_archive():
+    return FileResponse(settings.ROOT_DIR / "frontend/archive.html")
 
 
 @app.get("/orders/{order_id}/pdf")
@@ -560,7 +123,7 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
                 f"""
                 <li>
                     <strong>{escape(pdf.file_name)}</strong>
-                    <span class="muted">/uploads/{escape(pdf.file_name)}</span>
+                    <span class="muted">{escape(pdf.url)}</span>
                 </li>
                 """
                 for pdf in part.pdfs
@@ -866,6 +429,7 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
 @app.get("/reports/ai-pdf")
 def get_ai_report_pdf(db: Session = Depends(database.get_db)):
     # 1. Pobieranie danych z bazy
+    ai_model = get_ai_model()
     orders = db.query(models.Order).all()
 
     production_data = []
@@ -938,6 +502,7 @@ def generate_order_ai_summary(
         order_id: int,
         db: Session = Depends(database.get_db)
 ):
+    ai_model = get_ai_model()
     order = db.query(models.Order) \
         .filter(models.Order.id == order_id) \
         .first()
@@ -1089,6 +654,7 @@ def get_archive_ai_report(
         db: Session = Depends(database.get_db)
 ):
 
+    ai_model = get_ai_model()
     query = db.query(models.Order).filter(
         models.Order.status == OrderStatus.ARCHIVED
     )
@@ -1408,131 +974,3 @@ def get_archive_ai_report(
                 "attachment; filename=archive_ai_report.pdf"
         }
     )
-
-
-@app.put("/steps/{step_id}/toggle")
-def toggle_step_status(step_id: int, db: Session = Depends(database.get_db)):
-    step = db.query(models.ProcessStep).filter(models.ProcessStep.id == step_id).first()
-    if not step:
-        raise HTTPException(status_code=404, detail="Krok nie istnieje")
-
-    step.is_completed = not step.is_completed
-    if step.is_completed:
-        step.completed_at = datetime.utcnow()
-        step.completed_by = step.completed_by or step.operator
-    else:
-        step.completed_at = None
-        step.completed_by = None
-    db.commit()
-    return {"is_completed": step.is_completed, "completed_at": step.completed_at, "completed_by": step.completed_by}
-
-@app.put("/steps/{step_id}/production-record")
-def update_step_production_record(
-    step_id: int,
-    record: StepProductionRecord,
-    db: Session = Depends(database.get_db)
-):
-    step = db.query(models.ProcessStep).filter(models.ProcessStep.id == step_id).first()
-    if not step:
-        raise HTTPException(status_code=404, detail="Krok nie istnieje")
-
-    if record.material_quantity is not None and record.material_quantity < 0:
-        raise HTTPException(status_code=400, detail="Ilość materiału nie może być ujemna")
-
-    step.is_completed = record.is_completed
-    step.completed_by = record.completed_by.strip() if record.completed_by else None
-    step.production_notes = record.production_notes.strip() if record.production_notes else None
-    step.material_used = record.material_used.strip() if record.material_used else None
-    step.material_quantity = record.material_quantity
-    step.material_unit = record.material_unit.strip() if record.material_unit else None
-
-    if record.is_completed:
-        step.completed_at = step.completed_at or datetime.utcnow()
-        step.completed_by = step.completed_by or step.operator
-    else:
-        step.completed_at = None
-        step.completed_by = None
-
-    db.commit()
-    db.refresh(step)
-
-    return {
-        "id": step.id,
-        "is_completed": step.is_completed,
-        "completed_at": step.completed_at,
-        "completed_by": step.completed_by,
-        "production_notes": step.production_notes,
-        "material_used": step.material_used,
-        "material_quantity": step.material_quantity,
-        "material_unit": step.material_unit,
-    }
-
-@app.get("/operators/")
-def get_operators(db: Session = Depends(database.get_db)):
-    return db.query(models.Operator).all()
-
-@app.post("/operators/")
-def add_operator(name: str, db: Session = Depends(database.get_db)):
-    new_op = models.Operator(name=name)
-    db.add(new_op)
-    db.commit()
-    return new_op
-
-@app.delete("/operators/{op_id}")
-def delete_operator(op_id: int, db: Session = Depends(database.get_db)):
-    op = db.query(models.Operator).filter(models.Operator.id == op_id).first()
-    if not op:
-        raise HTTPException(status_code=404, detail="Operator nie istnieje")
-
-    assigned_orders = db.query(models.Order).filter(
-        models.Order.operator == op.name,
-        models.Order.status.notin_([OrderStatus.COMPLETED, OrderStatus.ARCHIVED])
-    ).first()
-
-    if assigned_orders:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Nie można usunąć operatora {op.name}, ponieważ jest przypisany do trwających zleceń."
-        )
-
-    db.delete(op)
-    db.commit()
-    return {"message": "Operator usunięty"}
-
-@app.post("/register/")
-def register_user(username: str, password: str, full_name: str, db: Session = Depends(database.get_db)):
-    hashed_pw = models.pwd_context.hash(password)
-    user = models.User(username=username, hashed_password=hashed_pw, full_name=full_name)
-    db.add(user)
-    db.commit()
-    return {"message": "Użytkownik zarejestrowany"}
-
-
-@app.post("/login/")
-def login_user(username: str, password: str, response: Response, db: Session = Depends(database.get_db)):
-    user = db.query(models.User).filter(models.User.username == username).first()
-    if not user or not models.pwd_context.verify(password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Nieprawidłowy login lub hasło")
-
-    response.set_cookie(key="logged_in", value="true", httponly=True)
-    return {"message": "Zalogowano pomyślnie"}
-
-
-@app.post("/logout/")
-def logout(response: Response):
-    response.delete_cookie("logged_in")
-    return {"message": "Wylogowano"}
-
-
-# Sprawdź, czy masz to w main.py:
-@app.post("/register/")
-def register_user(username: str, password: str, db: Session = Depends(database.get_db)):
-    existing_user = db.query(models.User).filter(models.User.username == username).first()
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Użytkownik już istnieje")
-
-    hashed_pw = models.pwd_context.hash(password)
-    user = models.User(username=username, hashed_password=hashed_pw)
-    db.add(user)
-    db.commit()
-    return {"message": "Użytkownik zarejestrowany"}

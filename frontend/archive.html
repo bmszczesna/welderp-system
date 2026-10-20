@@ -107,6 +107,7 @@
 
 </div>
 
+<script src="/frontend/js/api.js"></script>
 <script>
 
 function escapeHtml(value) {
@@ -164,13 +165,13 @@ async function loadArchive() {
                     <p class="order-number">
 
                         <strong>
-                            ${order.order_number}
+                            ${escapeHtml(order.order_number)}
                         </strong>
 
                     </p>
 
                     <p class="client">
-                        ${order.client_name}
+                        ${escapeHtml(order.client_name)}
                     </p>
 
                 </div>
@@ -261,7 +262,7 @@ function openArchiveModal(orderId) {
                             margin-bottom: 10px;
                         ">
 
-                            ${order.order_number}
+                            ${escapeHtml(order.order_number)}
 
                         </h2>
 
@@ -271,7 +272,7 @@ function openArchiveModal(orderId) {
                                 Klient:
                             </strong>
 
-                            ${order.client_name}
+                            ${escapeHtml(order.client_name)}
 
                         </p>
 
@@ -383,7 +384,7 @@ function openArchiveModal(orderId) {
                                 font-size: 16px;
                             ">
 
-                                ${part.part_name}
+                                ${escapeHtml(part.part_name)}
 
                             </strong>
 
@@ -392,13 +393,14 @@ function openArchiveModal(orderId) {
                                 color: #6b7280;
                             ">
 
-                                👤 ${part.operator || "Brak operatora"}
+                                👤 ${escapeHtml(part.operator || "Brak operatora")}
 
                             </span>
 
                         </div>
                 `;
 
+                html += (part.pdfs || []).map(pdf => `<a target="_blank" class="pdf-badge" href="${escapeHtml(pdf.url)}">${escapeHtml(pdf.file_name)}</a>`).join(' ');
                 if (part.steps.length > 0) {
 
                     html += `

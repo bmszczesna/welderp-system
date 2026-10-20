@@ -1,218 +1,65 @@
-import sys
-from unittest.mock import MagicMock
-import uuid
-
-sys.modules["weasyprint"] = MagicMock()
-
-from fastapi.testclient import TestClient
-from backend.main import app
-
-client = TestClient(app)
+"""Regression tests use the isolated client fixture, never the user's database."""
 
 
-def print_response(test_name, method, endpoint, response):
-    print("\n" + "=" * 70)
-    print(f"TEST: {test_name}")
-    print(f"REQUEST: {method} {endpoint}")
-    print(f"STATUS: {response.status_code}")
-
-    try:
-        print(f"RESPONSE: {response.json()}")
-    except Exception:
-        print(f"RESPONSE: {response.text}")
-
-    print("=" * 70)
+def test_get_orders(client):
+    response = client.get('/orders/')
+    assert response.status_code == 200 and response.json() == []
 
 
-# ============================================================
-# COMPONENT TESTING
-# ============================================================
+def test_create_order(client, order_payload):
+    response = client.post('/orders/', json=order_payload)
+    assert response.status_code == 201
+    order = client.get(f"/orders/{response.json()['order_id']}").json()
+    assert order['order_number'] == order_payload['order_number']
+    assert order['status'] == 'IN_QUEUE'
 
-def test_get_orders():
 
-    response = client.get("/orders/")
+def test_get_nonexistent_order(client):
+    assert client.get('/orders/999999').status_code == 404
 
-    print_response(
-        "COMP-01 Pobranie listy zlecen",
-        "GET",
-        "/orders/",
-        response
-    )
 
+def test_invalid_status(client, order_payload):
+    order_id = client.post('/orders/', json=order_payload).json()['order_id']
+    assert client.put(f'/orders/{order_id}/status?status=XYZ').status_code == 400
+    assert client.get(f'/orders/{order_id}').json()['status'] == 'IN_QUEUE'
+
+
+def test_add_operator(client):
+    response = client.post('/operators/', params={'name': 'Operator'})
     assert response.status_code == 200
+    assert client.get('/operators/').json() == [{'id': response.json()['id'], 'name': 'Operator'}]
 
 
-def test_create_order():
-    order_number = f"TEST_{uuid.uuid4().hex[:8]}"
-
-    response = client.post(
-        "/orders/",
-        json={
-            "order_number": order_number,
-            "client_name": "Klient Testowy",
-            "parts": []
-        }
-    )
-
-    print_response(
-        "COMP-02 Utworzenie zlecenia",
-        "POST",
-        "/orders/",
-        response
-    )
-
-    assert response.status_code in [201, 400]
+def test_sql_injection_login(client):
+    assert client.post('/register/', json={'username': 'admin', 'password': 'hasło', 'full_name': 'Administrator'}).status_code == 201
+    response = client.post('/login/', json={'username': 'admin', 'password': "' OR '1'='1"})
+    assert response.status_code == 401 and 'logged_in' not in response.cookies
 
 
-def test_get_nonexistent_order():
-
-    response = client.get("/orders/999999")
-
-    print_response(
-        "COMP-03 Pobranie nieistniejacego zlecenia",
-        "GET",
-        "/orders/999999",
-        response
-    )
-
-    assert response.status_code == 404
+def test_sql_injection_in_operator_name(client):
+    name = "Robert'); DROP TABLE operators;--"
+    assert client.post('/operators/', params={'name': name}).status_code == 200
+    assert client.get('/operators/').json()[0]['name'] == name
+    assert client.post('/operators/', params={'name': 'Kolejny'}).status_code == 200
 
 
-def test_invalid_status():
-
-    response = client.put(
-        "/orders/1/status?status=XYZ"
-    )
-
-    print_response(
-        "COMP-04 Niepoprawna zmiana statusu",
-        "PUT",
-        "/orders/1/status?status=XYZ",
-        response
-    )
-
-    assert response.status_code in [400, 404]
+def test_xss_in_order_creation(client, order_payload):
+    # API storage/JSON contract only; this is not a browser security test.
+    order_payload['client_name'] = "<script>alert('hack')</script>"
+    response = client.post('/orders/', json=order_payload)
+    assert response.status_code == 201
+    result = client.get(f"/orders/{response.json()['order_id']}")
+    assert result.headers['content-type'] == 'application/json'
+    assert result.json()['client_name'] == order_payload['client_name']
 
 
-def test_add_operator():
-
-    unique_name = f"TestOperator_{uuid.uuid4().hex[:8]}"
-
-    response = client.post(
-        f"/operators/?name={unique_name}"
-    )
-
-    print_response(
-        "COMP-05 Dodanie operatora",
-        "POST",
-        f"/operators/?name={unique_name}",
-        response
-    )
-
-    assert response.status_code == 200
+def test_nonexistent_order_access(client):
+    assert client.get('/orders/99999999').status_code == 404
 
 
-# ============================================================
-# SECURITY TESTING
-# ============================================================
-
-def test_sql_injection_login():
-
-    response = client.post(
-        "/login/",
-        params={
-            "username": "admin",
-            "password": "' OR '1'='1"
-        }
-    )
-
-    print_response(
-        "SEC-01 SQL Injection podczas logowania",
-        "POST",
-        "/login/",
-        response
-    )
-
-    assert response.status_code == 401
+def test_invalid_http_method(client):
+    assert client.delete('/orders/').status_code == 405
 
 
-def test_sql_injection_in_operator_name():
-
-    payload = f"Robert_{uuid.uuid4().hex[:8]}'); DROP TABLE operators;--"
-
-    response = client.post(
-        f"/operators/?name={payload}"
-    )
-
-    print_response(
-        "SEC-02 SQL Injection w nazwie operatora",
-        "POST",
-        f"/operators/?name={payload}",
-        response
-    )
-
-    assert response.status_code == 200
-
-
-def test_xss_in_order_creation():
-    order_number = f"XSS_{uuid.uuid4().hex[:8]}"
-
-    response = client.post(
-        "/orders/",
-        json={
-            "order_number": order_number,
-            "client_name": "<script>alert('hack')</script>",
-            "parts": []
-        }
-    )
-
-    print_response(
-        "SEC-03 XSS w danych klienta",
-        "POST",
-        "/orders/",
-        response
-    )
-
-    assert response.status_code in [201, 400]
-
-
-def test_nonexistent_order_access():
-
-    response = client.get("/orders/99999999")
-
-    print_response(
-        "SEC-04 Dostep do nieistniejacego zasobu",
-        "GET",
-        "/orders/99999999",
-        response
-    )
-
-    assert response.status_code == 404
-
-
-def test_invalid_http_method():
-
-    response = client.delete("/orders/")
-
-    print_response(
-        "SEC-05 Niepoprawna metoda HTTP",
-        "DELETE",
-        "/orders/",
-        response
-    )
-
-    assert response.status_code in [404, 405]
-
-
-def test_invalid_order_id_type():
-
-    response = client.get("/orders/abc")
-
-    print_response(
-        "SEC-06 Niepoprawny typ identyfikatora",
-        "GET",
-        "/orders/abc",
-        response
-    )
-
-    assert response.status_code in [404, 422]
+def test_invalid_order_id_type(client):
+    assert client.get('/orders/abc').status_code == 422

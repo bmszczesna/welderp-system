@@ -60,13 +60,15 @@
             Nie masz konta? <a href="/frontend/register.html">Zarejestruj się</a>
         </div>
     </div>
-    <script>
+    <script src="/frontend/js/api.js"></script>
+<script>
         async function login() {
             const u = document.getElementById('username').value;
             const p = document.getElementById('password').value;
-            const res = await fetch(`/login/?username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}`, { method: 'POST' });
-            if(res.ok) window.location.href = "/kanban.html";
-            else alert("Błędne dane logowania!");
+            try {
+                await WeldERP.request('/login/', WeldERP.json('POST', {username: u, password: p}));
+                window.location.href = '/kanban.html';
+            } catch (error) { alert(error.message); }
         }
     </script>
 </body>

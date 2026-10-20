@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15-alpine
@@ -9,12 +7,19 @@ services:
       POSTGRES_PASSWORD: welderp_password
       POSTGRES_DB: welderp_db
     ports:
-      - "5431:5431"
+      - "5431:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U welderp_user -d welderp_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: welderp_backend
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
@@ -22,12 +27,13 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - db
-    env_file:
-      - .env
+      db:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://welderp_user:welderp_password@db:5432/welderp_db
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GEMINI_MODEL=${GEMINI_MODEL:-models/gemini-3-flash-preview}
+      - MAX_PDF_BYTES=${MAX_PDF_BYTES:-10485760}
 
 volumes:
   postgres_data:

@@ -63,6 +63,7 @@
 			</article>
 		</section>
 	</main>
+<datalist id="materialUnits"></datalist>
 
 	<div id="orderModal" class="modal-overlay" style="display:none;">
 		<div class="modal-box" style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;">
@@ -126,7 +127,7 @@
 
 					<div style="text-align: right; border-top: 1px solid #e5e7eb; padding-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
 						<button type="button" class="btn" style="background: #f3f4f6; color: #4b5563;" onclick="openModal(currentOpenOrderId)">Anuluj</button>
-						<button type="button" class="btn btn-primary" onclick="saveOrderChanges()">Zapisz zmiany</button>
+						<button id="saveOrderButton" type="button" class="btn btn-primary" onclick="saveOrderChanges()">Zapisz zmiany</button>
 					</div>
 				</form>
 			</div>
@@ -161,7 +162,8 @@
 		</div>
 	</div>
 
-	<script>
+	<script src="/frontend/js/api.js"></script>
+<script>
 		async function checkAuth() {
 			const res = await fetch("/orders/");
 			if (res.status === 401 || res.status === 403) {
@@ -189,10 +191,13 @@
 		let messageTimer = null;
 		let currentOpenOrderId = null;
 		let availableOperators = [];
+        WeldERP.request('/metadata/material-units').then(data => {
+            document.getElementById('materialUnits').innerHTML = data.units.map(unit => `<option value="${unit}"></option>`).join('');
+        }).catch(() => {});
 
 		function operatorOptionsHtml() {
 			return availableOperators.map(op =>
-				`<option value="${op.name}">${op.name}</option>`
+				`<option value="${escapeHtml(op.name)}">${escapeHtml(op.name)}</option>`
 			).join('');
 		}
 
@@ -244,7 +249,7 @@
 				"COMPLETED": "var(--done)"
 			};
 
-			document.getElementById('modalOrderNumber').innerHTML = `<span>Zlecenie: ${order.order_number}</span>`;
+			document.getElementById('modalOrderNumber').textContent = `Zlecenie: ${order.order_number}`;
 			document.getElementById('btnDownloadPdf').href = `/orders/${order.id}/pdf`;
 			document.getElementById('modalClient').textContent = order.client_name;
 			document.getElementById('modalOperator').textContent = order.operator || "Nie przypisano";
@@ -260,12 +265,23 @@
 			const btnNeedsCorrection = document.getElementById('btnNeedsCorrection');
 			btnNeedsCorrection.style.display = order.status === 'QUALITY_CHECK' ? 'inline-block' : 'none';
 
-			let partsHtml = `<ol class="modal-parts-list" style="padding-left: 20px; list-style-type: decimal;">`;
+			const readOnly = order.status === 'COMPLETED' || order.status === 'ARCHIVED';
+			const canRecordProduction = order.status === 'IN_PROGRESS' && !(order.parts || []).some(part => part.material_missing);
+			let productionHint = '';
+			if (order.status === 'QUALITY_CHECK') {
+				productionHint = 'Odznaczenie wykonanej operacji cofnie zlecenie do realizacji i wycofa zatwierdzenie jakości.';
+			} else if (order.status === 'IN_QUEUE') {
+				productionHint = 'Możesz cofnąć oznaczenie wykonania. Nowe wykonanie zapiszesz po przeniesieniu zlecenia do realizacji.';
+			} else if (readOnly) {
+				productionHint = 'Zlecenie jest zakończone. Rejestr produkcji jest dostępny tylko do odczytu.';
+			}
+			let partsHtml = productionHint ? `<p class="production-hint" style="font-size:13px; color:#4b5563;">${productionHint}</p>` : '';
+			partsHtml += `<ol class="modal-parts-list" style="padding-left: 20px; list-style-type: decimal;">`;
 
 			if (order.parts && order.parts.length > 0) {
 				order.parts.forEach(part => {
 					const pdfsHtml = (part.pdfs && part.pdfs.length > 0)
-						? part.pdfs.map(pdf => `<a href="/uploads/${pdf.file_name}" target="_blank" class="pdf-badge" style="margin-left:5px;">PDF</a>`).join('')
+						? part.pdfs.map(pdf => `<a href="${escapeHtml(pdf.url || ('/uploads/' + encodeURIComponent(pdf.file_name)))}" target="_blank" class="pdf-badge" style="margin-left:5px;">PDF</a>`).join('')
 						: '';
 					const materialText = part.material ? part.material : 'Brak wpisanego materiału';
 					const materialButtonText = part.material_missing ? 'Materiał uzupełniony' : 'Brak materiału';
@@ -279,17 +295,18 @@
 					partsHtml += `
 						<li style="margin-bottom: 15px;">
 							<div class="part-detail-row">
-								<span class="part-name-text" style="font-weight: 600;">${part.part_name}</span>
-								<span class="material-badge">Materiał: ${materialText}</span>
+								<span class="part-name-text" style="font-weight: 600;">${escapeHtml(part.part_name)}</span>
+								<span class="material-badge">Materiał: ${escapeHtml(materialText)}</span>
 								${missingBadge}
-								<span style="font-size: 12px; color: #1e40af; background: #dbeafe; padding: 2px 8px; border-radius: 12px;">👤 ${part.operator || 'Brak'}</span>
+								<span style="font-size: 12px; color: #1e40af; background: #dbeafe; padding: 2px 8px; border-radius: 12px;">👤 ${escapeHtml(part.operator || 'Brak')}</span>
 								<div class="part-pdfs">${pdfsHtml}</div>
 								${materialActionHtml}
 							</div>
 							<ol class="modal-steps-list" style="margin-top: 5px; padding-left: 30px;">
 									${part.steps.map(step => {
 										const checked = step.is_completed ? "checked" : "";
-										const disabled = order.status !== 'IN_PROGRESS' ? "disabled" : "";
+										const disabled = canRecordProduction ? "" : "disabled";
+										const completionDisabled = canRecordProduction || (step.is_completed && !readOnly) ? "" : "disabled";
 										const completedClass = step.is_completed ? "completed" : "";
 										const completedBy = step.completed_by || step.operator || part.operator || order.operator || "";
 										const materialUsed = step.material_used || part.material || "";
@@ -299,7 +316,7 @@
 										return `
 											<div class="step-item" data-step-id="${step.id}">
 											   <label class="step-check-row">
-												  <input type="checkbox" class="step-complete-checkbox" ${checked} ${disabled} onchange="saveStepProductionRecord(${step.id}, this.closest('.step-item'))">
+												  <input type="checkbox" class="step-complete-checkbox" ${checked} ${completionDisabled} onchange="saveStepCompletion(${step.id}, this)">
 												  <span class="step-text ${completedClass}">${escapeHtml(step.step_name)}</span>
 												  <span class="step-operator">Operator: ${escapeHtml(step.operator || 'Brak')}</span>
 											   </label>
@@ -319,18 +336,18 @@
 													 </label>
 													 <label>
 														Ilość
-														<input type="number" min="0" step="0.01" class="step-material-quantity" value="${escapeHtml(materialQuantity)}" ${disabled}>
+														<input type="text" inputmode="decimal" class="step-material-quantity" value="${escapeHtml(materialQuantity)}" placeholder="np. 1,25" ${disabled}>
 													 </label>
 													 <label>
 														Jedn.
-														<input type="text" class="step-material-unit" value="${escapeHtml(materialUnit)}" placeholder="kg / szt." ${disabled}>
+														<input type="text" class="step-material-unit" list="materialUnits" value="${escapeHtml(materialUnit)}" placeholder="kg / szt." ${disabled}>
 													 </label>
 												  </div>
 												  <label class="production-notes-label">
 													 Uwagi
 													 <textarea class="step-production-notes" rows="2" ${disabled}>${escapeHtml(productionNotes)}</textarea>
 												  </label>
-												  ${order.status === 'IN_PROGRESS' ? `
+												  ${canRecordProduction ? `
 													 <button type="button" class="btn production-save-btn" onclick="saveStepProductionRecord(${step.id}, this.closest('.step-item'))">Zapisz wpis</button>
 												  ` : ""}
 											   </div>
@@ -380,6 +397,10 @@
 			const container = document.getElementById('editPartsContainer');
 			const partEl = document.createElement('div');
 			partEl.className = 'edit-part-item';
+            partEl.dataset.partId = part.id || '';
+            partEl.dataset.clientKey = WeldERP.clientKey();
+            partEl.pendingFiles = [];
+            partEl.removedPdfIds = new Set();
 			partEl.style.border = '1px solid #e5e7eb';
 			partEl.style.padding = '14px';
 			partEl.style.marginBottom = '12px';
@@ -391,7 +412,7 @@
 			if (part.pdfs && part.pdfs.length > 0) {
 				pdfsHtml = part.pdfs.map(pdf => `
 					<div style="background: #fef2f2; padding: 4px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px; margin: 2px; font-size: 12px; border: 1px solid #fecaca;">
-						<span style="color: #991b1b;">${pdf.file_name}</span>
+						<span style="color: #991b1b;">${escapeHtml(pdf.file_name)}</span>
 						<button type="button" onclick="deletePdf(${pdf.id}, this)" style="border:none; background:none; color:#ef4444; font-weight:bold; cursor:pointer;">x</button>
 					</div>
 				`).join('');
@@ -401,7 +422,7 @@
 			   <div style="display: grid; grid-template-columns: minmax(180px, 2fr) minmax(150px, 1fr) auto; gap: 10px; margin-bottom: 15px; align-items: end;">
 				  <label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">
 					 Nazwa części
-					 <input type="text" class="edit-part-name" placeholder="Nazwa części" value="${part.part_name || ''}" style="width: 100%; margin-top: 6px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+					 <input type="text" class="edit-part-name" placeholder="Nazwa części" value="${escapeHtml(part.part_name || '')}" style="width: 100%; margin-top: 6px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
 				  </label>
 				  <label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">
 					 Operator
@@ -414,7 +435,7 @@
 			   </div>
 			   <label style="display: block; font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase; margin-bottom: 15px;">
 				  Materiał
-				  <input type="text" class="edit-part-material" placeholder="Materiał" value="${part.material || ''}" style="width: 100%; margin-top: 6px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
+				  <input type="text" class="edit-part-material" placeholder="Materiał" value="${escapeHtml(part.material || '')}" style="width: 100%; margin-top: 6px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px;">
 			   </label>
 
 			   <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 15px;">
@@ -424,7 +445,7 @@
 				  </div>
 				  <div style="display: flex; gap: 8px; align-items: center; background: #fff; padding: 6px; border-radius: 6px; border: 1px dashed #d1d5db;">
 				   <input type="file" class="new-pdf-input" multiple accept=".pdf" style="font-size: 12px; flex-grow: 1;">
-				   <button type="button" class="btn-small" onclick="uploadNewPdfs(${part.id}, this)" style="background: #374151; color: white; border: none; padding: 6px 12px; cursor: pointer; border-radius: 6px;">Dodaj</button>
+				   <button type="button" class="btn-small" onclick="uploadNewPdfs(this)" style="background: #374151; color: white; border: none; padding: 6px 12px; cursor: pointer; border-radius: 6px;">Dodaj</button>
 				</div>
 			   </div>
 
@@ -467,6 +488,7 @@
 	function addStepToEditUI(container, step = {}) {
 		const stepEl = document.createElement('div');
 		stepEl.className = 'edit-step-item';
+        stepEl.dataset.stepId = step.id || '';
 		stepEl.dataset.isCompleted = step.is_completed ? "true" : "false";
 		stepEl.dataset.completedBy = step.completed_by || "";
 		stepEl.dataset.completedAt = step.completed_at || "";
@@ -484,7 +506,7 @@
 			<span class="edit-step-number" style="font-size: 12px; font-weight: bold; color: #374151; padding-bottom: 8px;">Krok</span>
 			<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">
 				Nazwa kroku
-				<input type="text" class="edit-step-name" placeholder="Nazwa kroku" value="${step.step_name || ''}" style="width: 100%; margin-top: 6px; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 13px;">
+				<input type="text" class="edit-step-name" placeholder="Nazwa kroku" value="${escapeHtml(step.step_name || '')}" style="width: 100%; margin-top: 6px; padding: 6px 8px; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 13px;">
 			</label>
 			<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">
 				Operator
@@ -508,77 +530,72 @@
 	}
 
 	async function saveOrderChanges() {
-		const orderId = currentOpenOrderId;
-		if (!orderId) return;
-
-		const orderNum = document.getElementById('editOrderNumber').value.trim();
-		const clientName = document.getElementById('editClient').value.trim();
-		const deadline = document.getElementById('editDeadline').value;
-		const operator = document.getElementById('editOperator').value;
-
-		if (!orderNum || !clientName || !deadline) {
-			alert("Błąd: Wypełnij Numer zlecenia, Nazwę klienta oraz Termin!");
-			return;
-		}
-
-		const payload = {
-			order_number: orderNum,
-			client_name: clientName,
-			operator: operator || null,
-			date_deadline: deadline.includes('T') ? deadline : (deadline + "T00:00:00"),
-			parts: []
-		};
-
-		document.querySelectorAll('.edit-part-item').forEach(pBlock => {
-			const partName = pBlock.querySelector('.edit-part-name').value.trim();
-
-			const part = {
-				part_name: partName,
-				material: pBlock.querySelector('.edit-part-material').value.trim() || null,
-				operator: pBlock.querySelector('.edit-part-operator').value || null,
-				steps: []
-			};
-			
-			pBlock.querySelectorAll('.edit-step-item').forEach(sRow => {
-				const stepName = sRow.querySelector('.edit-step-name').value.trim();
-
-				part.steps.push({
-					step_name: stepName,
-					operator: sRow.querySelector('.edit-step-operator').value || null,
-					is_completed: sRow.dataset.isCompleted === "true",
-					completed_by: sRow.dataset.completedBy || null,
-					completed_at: sRow.dataset.completedAt || null,
-					production_notes: sRow.dataset.productionNotes || null,
-					material_used: sRow.dataset.materialUsed || null,
-					material_quantity: sRow.dataset.materialQuantity === "" ? null : Number(sRow.dataset.materialQuantity),
-					material_unit: sRow.dataset.materialUnit || null
-				});
-			});
-			
-			payload.parts.push(part);
-		});
-
-		try {
-			const res = await fetch(`/orders/${orderId}`, {
-				method: "PUT",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(payload)
-			});
-
-			if (res.ok) {
-				showMessage("Zlecenie zaktualizowane!", "success");
-				closeModal();
-				loadOrders();
-				refreshOperatorDropdowns();
-			} else {
-				const data = await res.json();
-				showMessage("Błąd zapisu: " + (data.detail || "Sprawdź dane"), "error");
-			}
-		} catch (err) {
-			console.error(err);
-			showMessage("Błąd połączenia z serwerem", "error");
-		}
-	}
+        if (!currentOpenOrderId) return;
+        const saveButton = document.getElementById('saveOrderButton');
+        if (saveButton.disabled) return;
+        saveButton.disabled = true;
+        let savedStructure = false;
+        try {
+            const number = document.getElementById('editOrderNumber').value.trim();
+            const client = document.getElementById('editClient').value.trim();
+            const deadline = document.getElementById('editDeadline').value;
+            if (!number || !client || !deadline) throw new Error('Uzupełnij numer, klienta i termin');
+            const blocks = [...document.querySelectorAll('.edit-part-item')];
+            if (!blocks.length) throw new Error('Zlecenie musi zawierać co najmniej jedną część');
+            const parts = blocks.map(block => {
+                const partName = block.querySelector('.edit-part-name').value.trim();
+                if (!partName) throw new Error('Uzupełnij nazwę każdej części');
+                const rows = [...block.querySelectorAll('.edit-step-item')];
+                if (!rows.length) throw new Error('Część musi zawierać co najmniej jedną operację');
+                return {id: block.dataset.partId ? Number(block.dataset.partId) : null,
+                    client_key: block.dataset.clientKey, part_name: partName,
+                    material: block.querySelector('.edit-part-material').value.trim() || null,
+                    operator: block.querySelector('.edit-part-operator').value || null,
+                    steps: rows.map(row => {
+                        const name = row.querySelector('.edit-step-name').value.trim();
+                        if (!name) throw new Error('Uzupełnij nazwę każdej operacji');
+                        return {id: row.dataset.stepId ? Number(row.dataset.stepId) : null,
+                            step_name: name, operator: row.querySelector('.edit-step-operator').value || null};
+                    })};
+            });
+            for (const block of blocks) {
+                for (const item of block.pendingFiles) if (!item.uploaded) await WeldERP.validatePDF(item.file);
+                if (block.querySelector('.new-pdf-input').files.length) throw new Error('Kliknij Dodaj przy wybranych załącznikach przed zapisaniem');
+            }
+            const result = await WeldERP.request(`/orders/${currentOpenOrderId}`, WeldERP.json('PUT', {
+                order_number: number, client_name: client, date_deadline: deadline + 'T00:00:00',
+                operator: document.getElementById('editOperator').value || null, parts
+            }));
+            savedStructure = true;
+            // Store returned IDs before uploads, so retrying cannot create duplicate parts/steps.
+            for (const block of blocks) {
+                const saved = result.parts.find(part => part.client_key === block.dataset.clientKey);
+                block.dataset.partId = saved.id;
+                block.querySelectorAll('.edit-step-item').forEach((row, index) => row.dataset.stepId = saved.steps[index].id);
+            }
+            for (const block of blocks) {
+                for (const pdfId of [...block.removedPdfIds]) {
+                    await WeldERP.request(`/parts/pdf/${pdfId}`, {method: 'DELETE'});
+                    block.removedPdfIds.delete(pdfId);
+                }
+                for (const item of block.pendingFiles) {
+                    if (!item.uploaded) {
+                        const uploaded = await WeldERP.uploadPDF(Number(block.dataset.partId), item.file);
+                        item.pdfId = uploaded.id;
+                        item.uploaded = true;
+                        item.tag.firstChild.textContent = item.file.name + ' — zapisano ';
+                    }
+                }
+            }
+            closeModal();
+            await loadOrders();
+            showMessage('Zlecenie i załączniki zapisane', 'success');
+        } catch (error) {
+            showMessage((savedStructure ? 'Dane zlecenia zapisane. Ponów zapis pozostałych załączników: ' : '') + error.message, 'error');
+        } finally {
+            saveButton.disabled = false;
+        }
+    }
 
 		function closeModal() {
 			document.getElementById('orderModal').style.display = "none";
@@ -655,7 +672,7 @@
 
 			card.innerHTML = `
 				<div class="card-header">
-					<p class="order-number"><strong>${order.order_number}</strong></p>
+					<p class="order-number"><strong>${escapeHtml(order.order_number)}</strong></p>
 				</div>
                 <p class="order-deadline">${deadlineStr}</p>
 				${missingMaterialHtml}
@@ -857,7 +874,7 @@
 			archiveModal.style.display = 'none';
 			try {
 				const res = await fetch(`/orders/${orderId}/status?status=ARCHIVED`, { method: "PUT" });
-				if (!res.ok) throw new Error();
+				if (!res.ok) { const data = await res.json(); throw new Error(WeldERP.errorMessage(data.detail)); }
 				showMessage("Zlecenie zarchiwizowano", "success");
 				closeModal();
 				await loadOrders();
@@ -888,7 +905,7 @@
 
 		try {
 			const res = await fetch(`/orders/${orderId}/needs-correction`, { method: "PUT" });
-			if (!res.ok) throw new Error();
+			if (!res.ok) { const data = await res.json(); throw new Error(WeldERP.errorMessage(data.detail)); }
 
 			showMessage("Zlecenie wróciło do oczekujących", "success");
 			closeModal();
@@ -901,7 +918,7 @@
 	async function togglePartMaterialMissing(partId, missing) {
 		try {
 			const res = await fetch(`/parts/${partId}/material-missing?missing=${missing}`, { method: "PUT" });
-			if (!res.ok) throw new Error();
+			if (!res.ok) { const data = await res.json(); throw new Error(WeldERP.errorMessage(data.detail)); }
 
 			showMessage(missing ? "Oznaczono brak materiału" : "Materiał uzupełniony", "success");
 			await loadOrders();
@@ -913,16 +930,29 @@
 		}
 	}
 
-		async function toggleStep(stepId, checkbox) {
-			const textSpan = checkbox.nextElementSibling;
+		async function saveStepCompletion(stepId, checkbox) {
+			const orderId = currentOpenOrderId;
+			const order = orders.find(order => order.id === orderId);
+			checkbox.disabled = true;
+			if (order?.status === 'IN_PROGRESS' && !(order.parts || []).some(part => part.material_missing)) {
+				// Keep saving the operator's current draft when the checkbox changes during production.
+				try { await saveStepProductionRecord(stepId, checkbox.closest('.step-item')); }
+				finally { if (checkbox.isConnected) checkbox.disabled = false; }
+				return;
+			}
+			const completed = checkbox.checked;
 			try {
-				const res = await fetch(`/steps/${stepId}/toggle`, { method: "PUT" });
-				if (res.ok) {
-					textSpan.classList.toggle("completed");
-				}
+				const result = await WeldERP.request(`/steps/${stepId}/completion`, WeldERP.json('PUT', {is_completed: completed}));
+				await loadOrders();
+				if (currentOpenOrderId === orderId) openModal(orderId);
+				const message = order?.status === 'QUALITY_CHECK' && result.order_status !== order.status
+					? 'Cofnięto wykonanie. Wycofano zatwierdzenie jakości i cofnięto zlecenie do ' + (result.order_status === 'IN_QUEUE' ? 'kolejki.' : 'realizacji.')
+					: completed ? 'Oznaczono operację jako wykonaną' : 'Cofnięto oznaczenie wykonania operacji';
+				showMessage(message, 'success');
 			} catch (err) {
-				alert("Błąd zapisu statusu");
-				checkbox.checked = !checkbox.checked;
+				checkbox.checked = !completed;
+				checkbox.disabled = false;
+				showMessage(err.message || 'Nie udało się zmienić wykonania operacji', 'error');
 			}
 		}
 
@@ -932,30 +962,28 @@
 			const checkbox = stepItem.querySelector('.step-complete-checkbox');
 			const quantityInput = stepItem.querySelector('.step-material-quantity');
 			const quantityValue = quantityInput.value.trim();
-			const materialQuantity = quantityValue === "" ? null : Number(quantityValue);
-
-			if (quantityValue !== "" && Number.isNaN(materialQuantity)) {
-				showMessage("Ilość materiału musi być liczbą", "error");
-				return;
-			}
+			const materialQuantity = quantityValue === "" ? null : Number(quantityValue.replace(',', '.'));
 
 			const payload = {
 				is_completed: checkbox.checked,
 				completed_by: stepItem.querySelector('.step-completed-by').value.trim() || null,
 				production_notes: stepItem.querySelector('.step-production-notes').value.trim() || null,
 				material_used: stepItem.querySelector('.step-material-used').value.trim() || null,
-				material_quantity: materialQuantity,
+				material_quantity: quantityValue || null,
 				material_unit: stepItem.querySelector('.step-material-unit').value.trim() || null
 			};
 
 			try {
+				if (materialQuantity !== null && (!Number.isFinite(materialQuantity) || materialQuantity < 0)) {
+					throw new Error("Ilość materiału musi być nieujemną, skończoną liczbą");
+				}
 				const res = await fetch(`/steps/${stepId}/production-record`, {
 					method: "PUT",
 					headers: { "Content-Type": "application/json" },
 					body: JSON.stringify(payload)
 				});
 
-				if (!res.ok) throw new Error();
+				if (!res.ok) { const data = await res.json(); throw new Error(WeldERP.errorMessage(data.detail)); }
 
 				showMessage("Wpis produkcyjny zapisany", "success");
 				await loadOrders();
@@ -963,57 +991,49 @@
 					openModal(currentOpenOrderId);
 				}
 			} catch (err) {
-				showMessage("Nie udało się zapisać wpisu produkcyjnego", "error");
-				await loadOrders();
-				if (currentOpenOrderId) {
-					openModal(currentOpenOrderId);
-				}
+				showMessage(err.message || "Nie udało się zapisać wpisu produkcyjnego", "error");
+				const savedStep = orders.flatMap(order => order.parts || []).flatMap(part => part.steps || []).find(step => step.id === stepId);
+				if (savedStep) checkbox.checked = savedStep.is_completed;
 			}
 		}
 
 	async function deletePdf(pdfId, element) {
-		if (!confirm("Czy na pewno chcesz usunąć ten plik?")) return;
+        const block = element.closest('.edit-part-item');
+        block.removedPdfIds.add(pdfId);
+        element.parentElement.remove();
+        showMessage('Załącznik zostanie usunięty po zapisaniu zmian');
+    }
 
-		try {
-			const res = await fetch(`/parts/pdf/${pdfId}`, { method: "DELETE" });
-			if (res.ok) {
-				element.parentElement.remove(); // Usuwa wizualnie tag pliku z edycji
-				showMessage("Plik usunięty", "success");
-			} else {
-				showMessage("Błąd podczas usuwania pliku", "error");
-			}
-		} catch (err) {
-			console.error(err);
-			showMessage("Błąd połączenia", "error");
-		}
-	}
+    async function uploadNewPdfs(btnElement) {
+        const block = btnElement.closest('.edit-part-item');
+        const input = block.querySelector('.new-pdf-input');
+        try {
+            const files = [...input.files];
+            for (const file of files) await WeldERP.validatePDF(file);
+            for (const file of files) {
+                const item = {file, uploaded: false};
+                block.pendingFiles.push(item);
+                const tag = document.createElement('span');
+                item.tag = tag;
+                tag.textContent = file.name + ' — do zapisania ';
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.textContent = '×';
+                remove.onclick = () => {
+                    if (item.pdfId) block.removedPdfIds.add(item.pdfId);
+                    block.pendingFiles.splice(block.pendingFiles.indexOf(item), 1);
+                    tag.remove();
+                };
+                tag.appendChild(remove);
+                block.querySelector('.edit-pdfs-list').appendChild(tag);
+            }
+            input.value = '';
+            showMessage('Załączniki zostaną dodane po zapisaniu zmian');
+        } catch (error) {
+            showMessage(error.message, 'error');
+        }
+    }
 
-	async function uploadNewPdfs(partId, btnElement) {
-		const fileInput = btnElement.parentElement.querySelector(".new-pdf-input");
-		if (!fileInput.files || fileInput.files.length === 0) return;
-
-		const formData = new FormData();
-		for (let i = 0; i < fileInput.files.length; i++) {
-			formData.append("file", fileInput.files[i]);
-		}
-
-		try {
-			const res = await fetch(`/parts/${partId}/upload-pdf`, {
-				method: "POST",
-				body: formData
-			});
-
-			if (res.ok) {
-				await loadOrders();
-				switchToEditMode();
-			} else {
-				alert("Błąd podczas przesyłania plików.");
-			}
-		} catch (err) {
-			console.error(err);
-			alert("Błąd połączenia z serwerem.");
-		}
-	}
 
 	async function openOperatorModal() {
 		document.getElementById('operatorModal').style.display = 'block';

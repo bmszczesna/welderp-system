@@ -208,3 +208,19 @@ __marimo__/
 
 .env
 uploads/
+.pytest_tmp/
+.test-artifacts/
+backups/
+
+# Local configuration, personal notes, reports and working databases
+.idea/
+.env.*
+!.env.example
+/docs/
+/output/
+/tmp/
+/test.db
+/test_results_all.txt
+*.sqlite
+*.sqlite3
+*.sqlite-journal

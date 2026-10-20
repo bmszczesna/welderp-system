@@ -59,22 +59,18 @@
         <button onclick="register()">Zarejestruj się</button>
     </div>
 
-    <script>
+    <script src="/frontend/js/api.js"></script>
+<script>
         async function register() {
             const u = document.getElementById('username').value;
             const fn = document.getElementById('full_name').value;
             const p = document.getElementById('password').value;
 
-            const res = await fetch(`/register/?username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}&full_name=${encodeURIComponent(fn)}`, {
-                method: 'POST'
-            });
-
-            if(res.ok) {
-                alert("Zarejestrowano!");
-                window.location.href = "/frontend/login.html";
-            } else {
-                alert("Błąd rejestracji");
-            }
+            try {
+                await WeldERP.request('/register/', WeldERP.json('POST', {username: u, password: p, full_name: fn}));
+                alert('Zarejestrowano');
+                window.location.href = '/frontend/login.html';
+            } catch (error) { alert(error.message); }
         }
     </script>
 </body>

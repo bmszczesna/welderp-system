@@ -5,6 +5,8 @@ import datetime
 from sqlalchemy import Enum
 import enum
 from passlib.context import CryptContext
+from pathlib import Path
+from urllib.parse import quote
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -34,6 +36,9 @@ class Order(Base):
     # Tracking dates
     date_received = Column(DateTime, default=datetime.datetime.utcnow)
     date_deadline = Column(DateTime)
+    # Legacy rows remain NULL: their previous status-change time is unknown.
+    status_changed_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
 
     # Status
     status = Column(Enum(OrderStatus), default=OrderStatus.IN_QUEUE)
@@ -43,7 +48,8 @@ class Order(Base):
     operator = Column(String, nullable=True)
 
     # Relationship: One order can have multiple parts
-    parts = relationship("OrderPart", back_populates="owner", cascade="all, delete-orphan", order_by="OrderPart.id")
+    parts = relationship("OrderPart", back_populates="owner", cascade="all, delete-orphan", order_by="(OrderPart.position, OrderPart.id)")
+    status_events = relationship("OrderStatusEvent", back_populates="order", cascade="all, delete-orphan", order_by="OrderStatusEvent.id")
 
 
 class OrderPart(Base):
@@ -51,6 +57,7 @@ class OrderPart(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     part_name = Column(String, nullable=False)
+    position = Column(Integer, nullable=False, default=0)
     material = Column(String, nullable=True)
     material_missing = Column(Boolean, default=False)
     order_id = Column(Integer, ForeignKey("orders.id"))
@@ -59,13 +66,14 @@ class OrderPart(Base):
     pdfs = relationship("PartPDF", back_populates="part", cascade="all, delete-orphan")
 
     owner = relationship("Order", back_populates="parts")
-    steps = relationship("ProcessStep", back_populates="owner_part", cascade="all, delete-orphan", order_by="ProcessStep.id")
+    steps = relationship("ProcessStep", back_populates="owner_part", cascade="all, delete-orphan", order_by="(ProcessStep.position, ProcessStep.id)")
 
 class ProcessStep(Base):
     __tablename__ = "process_steps"
 
     id = Column(Integer, primary_key=True, index=True)
     step_name = Column(String, nullable=False)
+    position = Column(Integer, nullable=False, default=0)
     status = Column(Enum(OrderStatus), default=OrderStatus.IN_QUEUE)
     operator = Column(String, nullable=True)
 
@@ -87,6 +95,21 @@ class PartPDF(Base):
     file_path = Column(String, nullable=False)
     part_id = Column(Integer, ForeignKey("order_parts.id"))
     part = relationship("OrderPart", back_populates="pdfs")
+
+    @property
+    def url(self):
+        return "/uploads/" + quote(Path(self.file_path.replace("\\", "/")).name)
+
+
+class OrderStatusEvent(Base):
+    __tablename__ = "order_status_events"
+    id = Column(Integer, primary_key=True)
+    order_id = Column(Integer, ForeignKey("orders.id"), nullable=False, index=True)
+    from_status = Column(Enum(OrderStatus), nullable=True)
+    to_status = Column(Enum(OrderStatus), nullable=False)
+    occurred_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
+    reason = Column(String, nullable=False)
+    order = relationship("Order", back_populates="status_events")
 
 class Operator(Base):
     __tablename__ = "operators"

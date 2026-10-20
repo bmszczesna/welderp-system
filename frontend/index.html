@@ -55,7 +55,7 @@
             <option value="Brak">Nie wybrano</option>
         </select>
 
-        <button class="btn-success" onclick="submitOrder()">Utwórz Zlecenie</button>
+        <button id="createOrderButton" class="btn-success" onclick="submitOrder()">Utwórz Zlecenie</button>
     </div>
 
     <div class="right-panel">
@@ -65,12 +65,18 @@
     </div>
 </div>
 
+<script src="/frontend/js/api.js"></script>
 <script>
     let availableOperators = [];
+    let submittedOrder = null;
+
+    function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+    }
 
     function operatorOptionsHtml() {
         return availableOperators.map(op =>
-            `<option value="${op.name}">${op.name}</option>`
+            `<option value="${escapeHtml(op.name)}">${escapeHtml(op.name)}</option>`
         ).join('');
     }
 
@@ -78,6 +84,7 @@
         const container = document.getElementById("partsContainer");
         const partDiv = document.createElement("div");
         partDiv.className = "part-block";
+        partDiv.dataset.clientKey = WeldERP.clientKey();
         partDiv.innerHTML = `
             <div style="display: flex; gap: 10px; margin-bottom: 10px;">
                 <input type="text" class="part-name" placeholder="Nazwa części" style="flex-grow: 1; font-weight: bold; margin: 0;">
@@ -100,6 +107,7 @@
             </div>
         `;
         container.appendChild(partDiv);
+        addStepBlock(partDiv.querySelector('button[onclick="addStepBlock(this)"]'));
     }
 
     function addStepBlock(btnElement) {
@@ -118,91 +126,69 @@
     }
 
     async function submitOrder() {
-        const orderNum = document.getElementById("order_number").value.trim();
-        const clientName = document.getElementById("client_name").value.trim();
-        const dateReceived = document.getElementById("date_received").value;
-        const deadline = document.getElementById("deadline").value;
-        const operatorValue = document.getElementById("operator").value;
-
-        if (!orderNum || !clientName || !deadline) {
-            alert("Błąd: Wypełnij Numer zlecenia, Klienta oraz Deadline!");
-            return;
-        }
-
-        const payload = {
-            order_number: orderNum,
-            client_name: clientName,
-            date_received: dateReceived ? dateReceived + "T00:00:00" : new Date().toISOString(),
-            date_deadline: deadline + "T00:00:00",
-            operator: operatorValue === "Brak" ? null : operatorValue,
-            parts: []
-        };
-
-        document.querySelectorAll(".part-block").forEach(partBlock => {
-            const partName = partBlock.querySelector(".part-name").value.trim();
-            if (!partName) return;
-
-            const partOperator = partBlock.querySelector(".part-operator").value || payload.operator;
-            const partMaterial = partBlock.querySelector(".part-material").value.trim();
-
-            const steps = [];
-            partBlock.querySelectorAll(".step-input-group").forEach(stepGroup => {
-                const stepName = stepGroup.querySelector(".step-name").value.trim();
-                if (stepName) {
-                    steps.push({
-                        step_name: stepName,
-                        operator: stepGroup.querySelector(".step-operator").value || partOperator
-                    });
-                }
-            });
-
-            payload.parts.push({ part_name: partName, material: partMaterial || null, steps: steps, operator: partOperator });
-        });
-
+        const button = document.getElementById('createOrderButton');
+        button.disabled = true;
         try {
-            const res = await fetch("/orders/", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify(payload)
-            });
-
-            if (!res.ok) throw new Error("Błąd tworzenia zlecenia");
-
-            const data = await res.json();
-            const orderId = data.order_id;
-
-            const orderRes = await fetch(`/orders/${orderId}`);
-            const orderData = await orderRes.json();
-
-            const partMap = {};
-            orderData.parts.forEach(p => partMap[p.part_name] = p.id);
-
-            const partBlocks = document.querySelectorAll(".part-block");
-            for (let partBlock of partBlocks) {
-                const partName = partBlock.querySelector(".part-name").value.trim();
-                const partId = partMap[partName];
-
-                const filesToUpload = partFilesMap.get(partBlock) || [];
-                if (filesToUpload.length > 0 && partId) {
-                    for (const fileObj of filesToUpload) {
-                        const formData = new FormData();
-                        formData.append("file", fileObj.file);
-
-                        await fetch(`/parts/${partId}/upload-pdf`, {
-                            method: "POST",
-                            body: formData
-                        });
+            const partBlocks = [...document.querySelectorAll('.part-block')];
+            for (const block of partBlocks) {
+                for (const item of partFilesMap.get(block) || []) {
+                    if (!item.uploaded) await WeldERP.validatePDF(item.file);
+                }
+            }
+            if (!submittedOrder) {
+                const orderNumber = document.getElementById('order_number').value.trim();
+                const client = document.getElementById('client_name').value.trim();
+                const received = document.getElementById('date_received').value || WeldERP.localDate();
+                const deadline = document.getElementById('deadline').value;
+                if (!orderNumber || !client || !deadline) throw new Error('Uzupełnij numer zlecenia, klienta i termin');
+                if (deadline < received) throw new Error('Termin nie może być wcześniejszy niż data otrzymania');
+                if (!partBlocks.length) throw new Error('Dodaj co najmniej jedną część');
+                const operator = document.getElementById('operator').value;
+                const payload = {order_number: orderNumber, client_name: client,
+                    date_received: received + 'T00:00:00', date_deadline: deadline + 'T00:00:00',
+                    operator: operator === 'Brak' ? null : operator, parts: []};
+                for (const block of partBlocks) {
+                    const name = block.querySelector('.part-name').value.trim();
+                    if (!name) throw new Error('Każda część musi mieć nazwę');
+                    const partOperator = block.querySelector('.part-operator').value || payload.operator;
+                    const rows = [...block.querySelectorAll('.step-input-group')];
+                    if (!rows.length) throw new Error('Każda część musi mieć co najmniej jedną operację');
+                    const steps = rows.map(row => {
+                        const stepName = row.querySelector('.step-name').value.trim();
+                        if (!stepName) throw new Error('Każda operacja musi mieć nazwę');
+                        return {step_name: stepName, operator: row.querySelector('.step-operator').value || partOperator};
+                    });
+                    payload.parts.push({client_key: block.dataset.clientKey, part_name: name,
+                        material: block.querySelector('.part-material').value.trim() || null,
+                        operator: partOperator, steps});
+                }
+                submittedOrder = await WeldERP.request('/orders/', WeldERP.json('POST', payload));
+                document.querySelectorAll('.left-panel input, .left-panel select, .part-name, .part-material, .part-operator, .step-name, .step-operator').forEach(el => el.disabled = true);
+                document.querySelectorAll('[onclick*="addPartBlock"], [onclick*="addStepBlock"], .btn-remove').forEach(el => el.disabled = true);
+            }
+            for (const block of partBlocks) {
+                const storedPart = submittedOrder.parts.find(part => part.client_key === block.dataset.clientKey);
+                if (!storedPart) throw new Error('Nie znaleziono identyfikatora zapisanej części');
+                for (const item of partFilesMap.get(block) || []) {
+                    if (!item.uploaded) {
+                        await WeldERP.uploadPDF(storedPart.id, item.file);
+                        item.uploaded = true;
+                        item.preview.querySelector('span').textContent = item.file.name + ' — zapisano';
+                        item.preview.querySelector('button').disabled = true;
                     }
                 }
             }
-
-            alert("Zlecenie utworzone pomyślnie!");
-            window.location.href = "/kanban.html";
-        } catch (err) {
-            alert("Wystąpił błąd podczas tworzenia zlecenia lub przesyłania plików.");
-            console.error(err);
+            alert('Zlecenie i załączniki zapisane');
+            window.location.href = '/kanban.html';
+        } catch (error) {
+            const prefix = submittedOrder ? `Zlecenie ${submittedOrder.order_number} jest już zapisane. Popraw załączniki i ponów, aby dokończyć ich przesyłanie.\n` : '';
+            alert(prefix + error.message);
+        } finally {
+            button.disabled = false;
+            if (submittedOrder) button.textContent = 'Dokończ przesyłanie załączników';
         }
-    };
+    }
+
 
     const partFilesMap = new Map();
 
@@ -218,13 +204,13 @@
             fileDiv.dataset.fileId = fileId;
             fileDiv.style = "display: flex; justify-content: space-between; background: #eee; padding: 2px 5px; margin-bottom: 2px; border-radius: 4px;";
             fileDiv.innerHTML = `
-                <span>${file.name}</span>
+                <span>${escapeHtml(file.name)}</span>
                 <button type="button" style="color:red; background:none; border:none; cursor:pointer;" onclick="removeFile(this, '${fileId}')">x</button>
             `;
             previewList.appendChild(fileDiv);
 
             if (!partFilesMap.has(partId)) partFilesMap.set(partId, []);
-            partFilesMap.get(partId).push({ id: fileId, file: file });
+            partFilesMap.get(partId).push({ id: fileId, file: file, preview: fileDiv });
         });
 
         input.value = "";
@@ -248,7 +234,11 @@
             select.innerHTML = defaultOption + operatorOptionsHtml();
         });
     }
-    window.addEventListener('DOMContentLoaded', loadOperatorsToDropdowns);
+    window.addEventListener('DOMContentLoaded', async () => {
+        document.getElementById('date_received').value = WeldERP.localDate();
+        addPartBlock();
+        try { await loadOperatorsToDropdowns(); } catch (error) { alert('Nie udało się pobrać operatorów: ' + error.message); }
+    });
 </script>
 </body>
 </html>

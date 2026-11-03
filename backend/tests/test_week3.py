@@ -32,7 +32,8 @@ def upload(client, part_id, name='rysunek.pdf', content=PDF, mime='application/p
 
 def test_health_and_static_pages(client):
     assert client.get('/health').json() == {'status': 'ok', 'database': 'ok'}
-    for url in ['/', '/index.html', '/frontend/js/api.js', '/archive.html']:
+    for url in ['/', '/index.html', '/frontend/js/api.js', '/archive.html',
+                '/frontend/alerts.html', '/frontend/js/alerts.js']:
         assert client.get(url).status_code == 200
 
 

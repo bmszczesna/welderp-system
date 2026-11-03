@@ -99,7 +99,8 @@ def create_order(db, payload):
     duplicate_number(db, payload.order_number)
     order = models.Order(order_number=payload.order_number, client_name=payload.client_name,
                          date_received=payload.date_received, date_deadline=payload.date_deadline,
-                         operator=payload.operator, status=OrderStatus.IN_QUEUE)
+                         operator=payload.operator, status=OrderStatus.IN_QUEUE,
+                         status_changed_at=datetime.utcnow())
     db.add(order)
     db.add(models.OrderStatusEvent(order=order, from_status=None, to_status=OrderStatus.IN_QUEUE,
                                   reason="Utworzenie zlecenia"))

@@ -1,6 +1,6 @@
 """Input validation and the public API contract for weeks 1 to 3."""
 from datetime import datetime, timezone
-from typing import Annotated, Optional
+from typing import Annotated, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -236,6 +236,21 @@ class StatusEventResponse(ORMResponse):
     to_status: OrderStatus
     occurred_at: datetime
     reason: str
+
+
+class AlertItem(BaseModel):
+    order_id: int
+    order_number: str
+    client_name: Optional[str] = None
+    status: OrderStatus
+    alert_type: Literal["queue_delay", "deadline_overdue"]
+    message: str
+    days_count: int
+
+
+class AlertsListResponse(BaseModel):
+    total_alerts: int
+    items: list[AlertItem]
 
 
 class LoginRequest(InputModel):

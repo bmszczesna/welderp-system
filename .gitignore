@@ -224,3 +224,5 @@ backups/
 *.sqlite
 *.sqlite3
 *.sqlite-journal
+PROJECT_REVIEW.md
+PLAN_TYDZIEN_4_5.md

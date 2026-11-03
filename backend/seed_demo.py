@@ -54,6 +54,7 @@ class Scenario:
     missing: bool = False
     correction: bool = False
     approved: bool = False
+    no_status_date: bool = False
 
 
 SCENARIOS = (
@@ -77,6 +78,20 @@ SCENARIOS = (
     Scenario(Status.ARCHIVED, -21, -8, 6, completed=-7, archived=-6, approved=True),
     Scenario(Status.ARCHIVED, -18, -5, 6, completed=-6, archived=-5, approved=True),
     Scenario(Status.ARCHIVED, -16, -3, 6, completed=-4, archived=-3, approved=True),
+
+    # --- ADDED: TYDZIEŃ 4 ---
+    # 021. Poniżej progu terminowości (zostało bezpiecznie 9 dni)
+    Scenario(Status.IN_PROGRESS, -2, 9, 2),
+    # 022. Po terminie: termin minął 10 dni temu.
+    Scenario(Status.IN_PROGRESS, -20, -10, 3),
+    # 023. Zlecenie w pełni zakończone z wpisanym czasem wykonania
+    Scenario(Status.COMPLETED, -10, -2, 6, completed=-1, approved=True),
+    # 024. Zlecenie zarchiwizowane
+    Scenario(Status.ARCHIVED, -40, -25, 6, completed=-24, archived=-23, approved=True),
+    # 025. Dokładnie w dniu terminu.
+    Scenario(Status.IN_PROGRESS, -4, 0, 3),
+    # 026. Starszy rekord bez daty zmiany statusu i historii statusów.
+    Scenario(Status.IN_QUEUE, -8, 5, no_status_date=True),
 )
 
 
@@ -85,6 +100,8 @@ def moment(reference, days, hour=9):
 
 
 def history_for(spec, reference):
+    if spec.no_status_date:
+        return []
     events = [(Status.IN_QUEUE, moment(reference, spec.received), "Utworzenie zlecenia")]
     if spec.status != Status.IN_QUEUE or spec.missing or spec.correction:
         events.append((Status.IN_PROGRESS, moment(reference, spec.received + 1, 8), "Rozpoczęcie realizacji"))
@@ -105,8 +122,12 @@ def history_for(spec, reference):
 
 def build_order(index, spec, reference):
     events = history_for(spec, reference)
-    start = events[1][1] if len(events) > 1 else events[0][1]
-    if spec.correction:
+    start = events[1][1] if len(events) > 1 else (
+        events[0][1] if events else moment(reference, spec.received)
+    )
+    if spec.no_status_date:
+        stop = max(start, moment(reference, -1, 17))
+    elif spec.correction:
         stop = events[-2][1] - timedelta(hours=1)
     elif spec.missing:
         stop = events[-1][1] - timedelta(hours=1)
@@ -157,7 +178,9 @@ def build_order(index, spec, reference):
     )
     order = models.Order(**payload.model_dump(exclude={"parts"}), status=spec.status,
                          is_approved=spec.approved, needs_correction=spec.correction,
-                         status_changed_at=events[-1][1],
+                         status_changed_at=(
+                             events[-1][1] if events and not spec.no_status_date else None
+                         ),
                          completed_at=moment(reference, spec.completed, 14) if spec.completed is not None else None)
     for position, part_data in enumerate(payload.parts):
         part = models.OrderPart(**part_data.model_dump(exclude={"steps", "client_key"}),
@@ -165,13 +188,14 @@ def build_order(index, spec, reference):
         for step_position, step_data in enumerate(part_data.steps):
             part.steps.append(models.ProcessStep(**step_data.model_dump(), position=step_position))
         order.parts.append(part)
-    previous = None
-    for status, occurred_at, reason in events:
-        order.status_events.append(models.OrderStatusEvent(
-            from_status=previous, to_status=status, occurred_at=occurred_at,
-            reason=f"{reason} (dane demonstracyjne)",
-        ))
-        previous = status
+    if not spec.no_status_date:
+        previous = None
+        for status, occurred_at, reason in events:
+            order.status_events.append(models.OrderStatusEvent(
+                from_status=previous, to_status=status, occurred_at=occurred_at,
+                reason=f"{reason} (dane demonstracyjne)",
+            ))
+            previous = status
     return order
 
 
@@ -179,6 +203,22 @@ def seed_demo(engine, reference_date=None):
     reference = reference_date or datetime.now(timezone.utc).date()
     added = skipped = added_operators = 0
     with Session(engine) as db, db.begin():
+
+        # --- KONTO DEMONSTRACYJNE ---
+        demo_username = "demo"
+        existing_user = db.scalars(
+            select(models.User).where(models.User.username == demo_username)
+        ).first()
+        if not existing_user:
+            demo_user = models.User(
+                username=demo_username,
+                full_name="Demo User",
+                hashed_password=models.pwd_context.hash("demo123"),
+            )
+            db.add(demo_user)
+            print(f"Utworzono domyślne konto demo: {demo_username} / demo123")
+        # --------------------------------------
+
         names = set(db.scalars(select(models.Operator.name)))
         for name in OPERATORS:
             if name not in names:

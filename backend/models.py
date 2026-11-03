@@ -37,7 +37,7 @@ class Order(Base):
     date_received = Column(DateTime, default=datetime.datetime.utcnow)
     date_deadline = Column(DateTime)
     # Legacy rows remain NULL: their previous status-change time is unknown.
-    status_changed_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=True)
+    status_changed_at = Column(DateTime, nullable=True)
     completed_at = Column(DateTime, nullable=True)
 
     # Status

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alerty - WeldERP</title>
+    <link rel="stylesheet" href="/frontend/css/kanban.css">
+</head>
+<body>
+    <main class="page">
+        <header class="topbar">
+            <div>
+                <h1 class="title">Alerty zleceń</h1>
+                <p class="alerts-subtitle">Aktywne opóźnienia i przekroczone terminy</p>
+            </div>
+            <div class="actions">
+                <button class="btn" type="button" onclick="window.location.href='/kanban.html'">Tablica Kanban</button>
+                <button class="btn" type="button" onclick="window.location.href='/archive.html'">Archiwum</button>
+                <button class="btn btn-primary" type="button" id="refreshAlerts">Odśwież alerty</button>
+            </div>
+        </header>
+
+        <section class="alerts-summary" aria-label="Podsumowanie alertów">
+            <div class="alerts-summary-item">
+                <span class="alerts-summary-label">Aktywne alerty</span>
+                <strong id="totalAlerts" class="alerts-summary-count">—</strong>
+            </div>
+            <div class="alerts-summary-item">
+                <span class="alerts-summary-label">Opóźnienia w kolejce</span>
+                <strong id="queueAlerts" class="alerts-summary-count queue-count">—</strong>
+            </div>
+            <div class="alerts-summary-item">
+                <span class="alerts-summary-label">Przekroczone terminy</span>
+                <strong id="deadlineAlerts" class="alerts-summary-count deadline-count">—</strong>
+            </div>
+            <span id="alertsUpdated" class="alerts-updated" aria-live="polite"></span>
+        </section>
+
+        <section class="alerts-toolbar" aria-label="Filtrowanie alertów">
+            <label class="alerts-filter-label" for="alertFilter">Rodzaj alertu</label>
+            <select id="alertFilter" class="search alerts-filter">
+                <option value="all">Wszystkie alerty</option>
+                <option value="queue_delay">Opóźnienie w kolejce</option>
+                <option value="deadline_overdue">Przekroczony termin</option>
+            </select>
+        </section>
+
+        <p id="alertsMessage" class="message alerts-message" role="status" hidden></p>
+        <section id="alertsList" class="alerts-list" aria-label="Lista alertów" aria-live="polite"></section>
+    </main>
+    <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/alerts.js"></script>
+</body>
+</html>

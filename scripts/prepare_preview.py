@@ -5,7 +5,7 @@ from pathlib import Path
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
-PROJECT = 'codex-warehouse-preview'
+PROJECT = 'welderp-magazyn'
 COMPOSE = ['docker', 'compose', '-p', PROJECT, '-f', str(ROOT / 'docker-compose.preview.yml')]
 DB_CONTAINER = PROJECT + '-db-1'
 DB_USER, DB_NAME = 'warehouse_test', 'warehouse_preview'

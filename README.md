@@ -52,10 +52,10 @@ Otwórz http://127.0.0.1:8016/ i zaloguj się:
 | Kierownik | `kierownik_demo` | `KierownikDemo123!` |
 | Operator | `operator_demo` | `OperatorDemo123!` |
 
-Skrypt uruchamia osobny projekt Compose `codex-warehouse-preview`, dodaje brakujące
+Skrypt uruchamia osobny projekt Compose `welderp-magazyn`, dodaje brakujące
 przykładowe zlecenia, operatorów, materiały, plany zużycia i dostawę. Nie nadpisuje
 istniejących haseł ani stanów magazynowych. Dane pozostają w nazwanym woluminie
-`codex-warehouse-preview_warehouse_preview_data` między uruchomieniami.
+`welderp-magazyn_warehouse_preview_data` między uruchomieniami.
 Przed uzupełnieniem danych istniejącej bazy powstaje pełna kopia w `backups/`.
 Pozostałe projekty Docker pozostają niezależne. Konta demonstracyjne służą do pracy lokalnej.
 
@@ -66,9 +66,9 @@ docker compose -f docker-compose.preview.yml stop
 docker compose -f docker-compose.preview.yml up -d
 ```
 
-## Magazyn kierownika i prognozy
+## Magazyn i prognozy
 
-Przycisk **Magazyn kierownika** na tablicy Kanban otwiera `/frontend/warehouse.html`.
+Przycisk **Magazyn** na tablicy Kanban otwiera `/frontend/warehouse.html`.
 Konto operatora nie widzi tego przycisku, a API magazynu odrzuca dostęp bez roli kierownika.
 Każda pozycja ma nazwę, jednostkę, bieżący stan i próg ostrzeżenia.
 

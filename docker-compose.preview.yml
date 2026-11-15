@@ -1,4 +1,4 @@
-name: codex-warehouse-preview
+name: welderp-magazyn
 services:
   db:
     image: postgres:15-alpine

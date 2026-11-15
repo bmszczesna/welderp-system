@@ -182,7 +182,7 @@
         try { user = await WeldERP.getUser(); }
         catch { window.location.replace('/'); return; }
         if (user.role !== 'manager') {
-            document.body.innerHTML = '<main class="page"><h1>Magazyn kierownika</h1><p>Twoje konto operatora nie ma dostępu do stanów i prognoz magazynu.</p><p><a href="/kanban.html">Wróć do tablicy Kanban</a></p></main>';
+            document.body.innerHTML = '<main class="page"><h1>Magazyn</h1><p>Twoje konto operatora nie ma dostępu do stanów i prognoz magazynu.</p><p><a href="/kanban.html">Wróć do tablicy Kanban</a></p></main>';
             return;
         }
         byId('warehousePage').hidden = false;

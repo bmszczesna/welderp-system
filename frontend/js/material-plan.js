@@ -16,7 +16,7 @@ window.MaterialPlan = (() => {
         const fieldset = document.createElement('fieldset');
         fieldset.className = 'material-plan';
         if (!manager) { fieldset.hidden = true; return fieldset; }
-        fieldset.innerHTML = `<legend>Plan materiałowy kierownika</legend>
+        fieldset.innerHTML = `<legend>Plan materiałowy</legend>
             <p>Te ilości zasilają prognozę magazynu. Wydanie na część pomniejsza jej pozostałe potrzeby.</p>
             <div class="material-plan-grid">
                 <label>Materiał magazynowy<select class="plan-material"><option value="">Bez planu materiałowego</option>

@@ -27,8 +27,7 @@ docker compose up --build -d
 - PostgreSQL z hosta: `localhost:5431`; wewnątrz Compose: `db:5432`.
 
 Podstawowa aplikacja działa bez pliku `.env` i bez klucza AI. Aby korzystać
-z raportów Gemini, skopiuj `.env.example` do `.env` i ustaw własny
-`GEMINI_API_KEY`. `.env.example` zawiera wyłącznie wzór konfiguracji.
+z raportów Gemini, ustaw własny `GEMINI_API_KEY` w lokalnym pliku `.env`.
 Pliki `.env`, dane logowania i lokalne kopie bazy nie są publikowane.
 
 Przy pierwszym uruchomieniu zarejestruj własne konto przez formularz logowania.

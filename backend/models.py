@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Float, Text, Numeric, CheckConstraint, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Boolean, Float, Text, Numeric, CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import relationship
 from backend.database import Base
 import datetime
@@ -18,6 +18,14 @@ class User(Base):
     username = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     full_name = Column(String, nullable=False)
+    role = Column(String(20), nullable=False, default="operator", server_default="operator")
+
+
+class UserSession(Base):
+    __tablename__ = "user_sessions"
+    token_hash = Column(String(64), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
 
 class OrderStatus(enum.Enum):
     IN_QUEUE = "IN_QUEUE"
@@ -64,6 +72,18 @@ class OrderPart(Base):
     material_missing = Column(Boolean, default=False)
     material_quantity = Column(Float, nullable=True)
     material_unit = Column(String, nullable=True)
+    warehouse_material_id = Column(Integer, ForeignKey("warehouse_materials.id"), nullable=True)
+    planned_quantity = Column(Numeric(18, 6), nullable=True)
+    planned_for = Column(Date, nullable=True)
+    planned_material = relationship("WarehouseMaterial")
+
+    @property
+    def planned_unit(self):
+        return self.planned_material.unit if self.planned_material else None
+
+    @property
+    def planned_material_name(self):
+        return self.planned_material.name if self.planned_material else None
     order_id = Column(Integer, ForeignKey("orders.id"))
     operator = Column(String, nullable=True)
 
@@ -151,9 +171,27 @@ class WarehouseMovement(Base):
 
     id = Column(Integer, primary_key=True)
     material_id = Column(Integer, ForeignKey("warehouse_materials.id"), nullable=False, index=True)
+    order_part_id = Column(Integer, ForeignKey("order_parts.id", ondelete="SET NULL"), nullable=True, index=True)
+    order_number = Column(String(255), nullable=False, default="", server_default="")
+    part_name = Column(String(255), nullable=False, default="", server_default="")
     request_id = Column(String(100), nullable=False, unique=True, default=lambda: str(uuid4()))
     kind = Column(String(20), nullable=False)
     quantity = Column(Numeric(18, 6), nullable=False)
     balance_after = Column(Numeric(18, 6), nullable=False)
+    note = Column(String(500), nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+
+
+class WarehouseDelivery(Base):
+    __tablename__ = "warehouse_deliveries"
+    __table_args__ = (
+        CheckConstraint("quantity > 0 AND quantity <= 999999999.999999", name="ck_delivery_quantity"),
+        CheckConstraint("status IN ('ordered', 'received', 'cancelled')", name="ck_delivery_status"),
+    )
+    id = Column(Integer, primary_key=True)
+    material_id = Column(Integer, ForeignKey("warehouse_materials.id"), nullable=False, index=True)
+    quantity = Column(Numeric(18, 6), nullable=False)
+    expected_on = Column(Date, nullable=False)
+    status = Column(String(20), nullable=False, default="ordered")
     note = Column(String(500), nullable=False, default="")
     created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)

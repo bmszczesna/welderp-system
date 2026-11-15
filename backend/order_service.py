@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
-from backend import models
+from backend import models, warehouse
 from backend.models import OrderStatus
 
 
@@ -13,6 +13,7 @@ def order_query(db):
     return db.query(models.Order).options(
         selectinload(models.Order.parts).selectinload(models.OrderPart.steps),
         selectinload(models.Order.parts).selectinload(models.OrderPart.pdfs),
+        selectinload(models.Order.parts).selectinload(models.OrderPart.planned_material),
     )
 
 
@@ -95,7 +96,7 @@ def validate_step_material(part, step):
         raise HTTPException(status_code=422, detail="Podaj materiał przy części lub operacji z podaną ilością")
 
 
-def create_order(db, payload):
+def create_order(db, payload, user=None):
     duplicate_number(db, payload.order_number)
     order = models.Order(order_number=payload.order_number, client_name=payload.client_name,
                          date_received=payload.date_received, date_deadline=payload.date_deadline,
@@ -109,6 +110,7 @@ def create_order(db, payload):
                                 operator=data.operator, position=index,
                                 material_quantity=data.material_quantity, material_unit=data.material_unit)
         order.parts.append(part)
+        warehouse.apply_part_plan(db, part, data, user)
         for step_index, step_data in enumerate(data.steps):
             step = models.ProcessStep()
             write_step(step, step_data, step_index)
@@ -118,7 +120,7 @@ def create_order(db, payload):
     return order
 
 
-def update_order(db, order, payload):
+def update_order(db, order, payload, user=None):
     editable(order)
     duplicate_number(db, payload.order_number, exclude=order.id)
     if order.date_received and payload.date_deadline.date() < order.date_received.date():
@@ -146,6 +148,7 @@ def update_order(db, order, payload):
             part = models.OrderPart()
         part.part_name, part.material, part.operator, part.position = (
             data.part_name, data.material, data.operator, position)
+        warehouse.apply_part_plan(db, part, data, user)
         for field in ("material_quantity", "material_unit"):
             if field in data.model_fields_set:
                 setattr(part, field, getattr(data, field))
@@ -163,6 +166,7 @@ def update_order(db, order, payload):
     kept_ids = {part.id for part in updated_parts if part.id is not None}
     for old_part in order.parts:
         if old_part.id not in kept_ids:
+            warehouse.detach_part_history(db, old_part.id)
             removed_paths.extend(pdf.file_path for pdf in old_part.pdfs)
     order.parts = updated_parts
     if has_missing_material(order):

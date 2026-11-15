@@ -5,21 +5,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Magazyn - WeldERP</title>
     <link rel="stylesheet" href="/frontend/css/kanban.css">
-    <link rel="stylesheet" href="/frontend/css/warehouse.css">
+    <link rel="stylesheet" href="/frontend/css/warehouse.css?v=manager-planning-1">
 </head>
 <body>
-<main class="page warehouse-page">
+<main class="page warehouse-page" id="warehousePage" hidden>
     <header class="topbar">
         <div>
             <p class="warehouse-eyebrow">WeldERP / materiały</p>
             <h1 class="title">Magazyn</h1>
-            <p class="warehouse-subtitle">Rejestruj dostawy jako przyjęcia, a zużycie produkcyjne jako rozchody.</p>
+            <p class="warehouse-subtitle">Panel kierownika: stany, zapotrzebowanie zleceń i plan dostaw.</p>
+            <p id="warehouseUser" class="warehouse-help"></p>
         </div>
         <nav class="actions" aria-label="Nawigacja magazynu">
             <a class="btn" href="/kanban.html">Tablica Kanban</a>
             <a class="btn" href="/frontend/alerts.html">Alerty</a>
             <button class="btn" id="refreshWarehouse" type="button">Odśwież</button>
             <button class="btn btn-primary" id="addMaterial" type="button">+ Dodaj materiał</button>
+            <button class="btn" id="warehouseLogout" type="button">Wyloguj</button>
         </nav>
     </header>
 
@@ -29,6 +31,21 @@
         <div><span>Brak na stanie</span><strong id="emptyStockCount">—</strong></div>
     </section>
     <p class="message" id="warehouseMessage" role="status" hidden></p>
+
+    <section class="warehouse-panel warehouse-planning-panel" aria-labelledby="forecastHeading">
+        <div class="warehouse-toolbar">
+            <div><h2 id="forecastHeading">Prognoza i domówienia</h2>
+                <p>Stan na koniec dnia, przy założeniu zużycia zgodnie z planami i terminowego przyjazdu dostaw.</p></div>
+            <label class="warehouse-search">Okres prognozy<select id="forecastHorizon" class="search">
+                <option value="7">7 dni</option><option value="14">14 dni</option><option value="30">30 dni</option>
+            </select></label>
+        </div>
+        <p id="forecastWarning" class="warehouse-forecast-warning" role="status" hidden></p>
+        <div class="warehouse-table-wrap"><table class="warehouse-table"><thead><tr>
+            <th>Materiał</th><th>Teraz</th><th>Stan jutro</th><th>Wyczerpanie zapasu</th><th>Do domówienia</th><th>Plan</th>
+        </tr></thead><tbody id="forecastRows"><tr><td colspan="6" class="warehouse-empty">Ładowanie prognozy…</td></tr></tbody></table></div>
+        <p class="warehouse-help warehouse-panel-note">Sugestia domówienia uzupełnia najniższy przewidywany stan do ustalonego minimum. Szczegóły pokazują potrzeby i dostawy każdego dnia.</p>
+    </section>
 
     <section class="warehouse-panel" aria-labelledby="stockHeading">
         <div class="warehouse-toolbar">
@@ -43,6 +60,15 @@
                 <tbody id="warehouseRows"><tr><td colspan="5" class="warehouse-empty">Ładowanie materiałów…</td></tr></tbody>
             </table>
         </div>
+    </section>
+
+    <section class="warehouse-panel warehouse-planning-panel" aria-labelledby="deliveriesHeading">
+        <div class="warehouse-toolbar"><div><h2 id="deliveriesHeading">Zaplanowane dostawy</h2>
+            <p>Plan dostawy uwzględnia prognoza. Stan rzeczywisty zwiększa się po potwierdzeniu przyjęcia.</p></div>
+            <button class="btn btn-primary" id="planDelivery" type="button">+ Zaplanuj dostawę</button></div>
+        <div class="warehouse-table-wrap"><table class="warehouse-table"><thead><tr>
+            <th>Materiał</th><th>Ilość</th><th>Termin</th><th>Status</th><th>Uwagi</th><th>Działania</th>
+        </tr></thead><tbody id="deliveryRows"></tbody></table></div>
     </section>
 </main>
 
@@ -68,6 +94,8 @@
         <p id="movementMaterial" class="warehouse-material-heading"></p>
         <p id="movementAvailable" class="warehouse-help"></p>
         <label id="movementQuantityLabel">Ilość<input name="quantity" inputmode="decimal" placeholder="np. 12,5" required></label>
+        <label id="movementPartLabel">Zlecenie / część<select name="order_part_id" id="movementPart"><option value="">Rozchód ogólny</option></select></label>
+        <p id="movementPlanHint" class="warehouse-help">Rozchód przypisany do części pomniejsza jej pozostałe zapotrzebowanie w prognozie.</p>
         <label>Uwagi / numer zlecenia <span class="warehouse-optional">(opcjonalnie)</span><textarea name="note" maxlength="500" rows="3" placeholder="np. Dostawa profili lub zużycie na ZL/001"></textarea></label>
         <p class="warehouse-form-error" role="alert" hidden></p>
         <div class="warehouse-dialog-actions"><button class="btn" type="button" data-close>Anuluj</button><button class="btn btn-primary" id="saveMovement" type="submit">Zapisz</button></div>
@@ -92,7 +120,25 @@
     <div id="movementHistory" class="warehouse-table-wrap"></div>
     <div class="warehouse-dialog-actions"><button class="btn" type="button" data-close>Zamknij</button></div>
 </dialog>
-<script src="/frontend/js/api.js"></script>
-<script src="/frontend/js/warehouse.js"></script>
+<dialog id="deliveryDialog" class="warehouse-dialog" aria-labelledby="deliveryHeading">
+    <form id="deliveryForm">
+        <h2 id="deliveryHeading">Zaplanuj dostawę</h2>
+        <p class="warehouse-help">To plan przyjazdu materiału. Dostawę potwierdzisz po jej faktycznym otrzymaniu.</p>
+        <label>Materiał<select name="material_id" id="deliveryMaterial" required></select></label>
+        <label>Zamawiana ilość<input name="quantity" inputmode="decimal" required></label>
+        <label>Planowany termin dostawy<input name="expected_on" type="date" required></label>
+        <label>Dostawca / uwagi<textarea name="note" rows="2" maxlength="500"></textarea></label>
+        <p class="warehouse-form-error" role="alert" hidden></p>
+        <div class="warehouse-dialog-actions"><button class="btn" type="button" data-close>Anuluj</button><button class="btn btn-primary" type="submit">Zapisz plan dostawy</button></div>
+    </form>
+</dialog>
+<dialog id="forecastDialog" class="warehouse-dialog warehouse-history-dialog" aria-labelledby="forecastDetailHeading">
+    <h2 id="forecastDetailHeading">Dzienna prognoza materiału</h2><p id="forecastMaterial" class="warehouse-material-heading"></p>
+    <div id="forecastDetails" class="warehouse-table-wrap"></div>
+    <div class="warehouse-dialog-actions"><button class="btn" type="button" data-close>Zamknij</button></div>
+</dialog>
+<script src="/frontend/js/api.js?v=manager-planning-1"></script>
+<script src="/frontend/js/warehouse-planning.js"></script>
+<script src="/frontend/js/warehouse.js?v=manager-planning-1"></script>
 </body>
 </html>

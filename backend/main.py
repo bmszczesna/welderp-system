@@ -15,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend import database, models, settings
+from backend import auth, database, models, settings
 from backend.integrations import HTML, get_ai_model
 from backend.migrations import initialize_database
 from backend.models import OrderStatus
@@ -65,8 +65,8 @@ def serve_order_form():
 
 
 @app.get("/kanban.html")
-def serve_kanban(request: Request):
-    if request.cookies.get("logged_in") != "true":
+def serve_kanban(user=Depends(auth.optional_user)):
+    if user is None:
         return RedirectResponse(url="/frontend/login.html")
     return FileResponse(settings.ROOT_DIR / "frontend/kanban.html")
 

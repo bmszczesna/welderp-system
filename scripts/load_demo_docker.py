@@ -2,9 +2,13 @@
 from datetime import datetime
 from pathlib import Path
 import subprocess
+import argparse
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--with-warehouse', action='store_true', help='Add role accounts, stock and material plans')
+    args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     directory = root / "backups"
     directory.mkdir(exist_ok=True)
@@ -20,10 +24,13 @@ def main():
     if b"PostgreSQL database dump" not in contents or b"PostgreSQL database dump complete" not in contents:
         raise SystemExit("Backup incomplete; no demo data was added.")
     print(f"PostgreSQL backup: {backup}", flush=True)
-    subprocess.run([
+    command = [
         "docker", "compose", "exec", "-T", "backend", "python", "-m", "backend.seed_demo",
         "--backup-file", "/app/backups/" + backup.name,
-    ], cwd=root, check=True)
+    ]
+    if args.with_warehouse:
+        command.append('--with-warehouse')
+    subprocess.run(command, cwd=root, check=True)
 
 
 if __name__ == "__main__":

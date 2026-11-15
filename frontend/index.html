@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>WeldERP - Zarządzanie Zleceniami</title>
+    <link rel="stylesheet" href="/frontend/css/material-plan.css">
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f3f5f9; padding: 20px; color: #1f2937; margin: 0; }
         .header-container { text-align: center; margin-bottom: 20px; }
@@ -65,7 +66,8 @@
     </div>
 </div>
 
-<script src="/frontend/js/api.js"></script>
+<script src="/frontend/js/api.js?v=manager-planning-1"></script>
+<script src="/frontend/js/material-plan.js"></script>
 <script>
     let availableOperators = [];
     let submittedOrder = null;
@@ -107,6 +109,7 @@
             </div>
         `;
         container.appendChild(partDiv);
+        partDiv.querySelector('.part-material').insertAdjacentElement('afterend', MaterialPlan.create());
         addStepBlock(partDiv.querySelector('button[onclick="addStepBlock(this)"]'));
     }
 
@@ -160,10 +163,10 @@
                     });
                     payload.parts.push({client_key: block.dataset.clientKey, part_name: name,
                         material: block.querySelector('.part-material').value.trim() || null,
-                        operator: partOperator, steps});
+                        operator: partOperator, steps, ...MaterialPlan.payload(block)});
                 }
                 submittedOrder = await WeldERP.request('/orders/', WeldERP.json('POST', payload));
-                document.querySelectorAll('.left-panel input, .left-panel select, .part-name, .part-material, .part-operator, .step-name, .step-operator').forEach(el => el.disabled = true);
+                document.querySelectorAll('.left-panel input, .left-panel select, .part-name, .part-material, .part-operator, .step-name, .step-operator, .plan-material, .plan-quantity, .plan-date').forEach(el => el.disabled = true);
                 document.querySelectorAll('[onclick*="addPartBlock"], [onclick*="addStepBlock"], .btn-remove').forEach(el => el.disabled = true);
             }
             for (const block of partBlocks) {
@@ -235,6 +238,7 @@
         });
     }
     window.addEventListener('DOMContentLoaded', async () => {
+        try { await MaterialPlan.initialize(); } catch { window.location.href = '/'; return; }
         document.getElementById('date_received').value = WeldERP.localDate();
         addPartBlock();
         try { await loadOperatorsToDropdowns(); } catch (error) { alert('Nie udało się pobrać operatorów: ' + error.message); }

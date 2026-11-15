@@ -35,7 +35,7 @@
                     onclick="window.location.href='/frontend/alerts.html'">
                 Alerty
             </button>
-            <button class="btn" onclick="window.location.href='/frontend/warehouse.html'">Magazyn</button>
+            <button class="btn" data-manager-only hidden onclick="window.location.href='/frontend/warehouse.html'">Magazyn kierownika</button>
         </div>
 
     </div>
@@ -114,7 +114,7 @@
 
 </div>
 
-<script src="/frontend/js/api.js"></script>
+<script src="/frontend/js/api.js?v=manager-planning-1"></script>
 <script>
 
 function escapeHtml(value) {

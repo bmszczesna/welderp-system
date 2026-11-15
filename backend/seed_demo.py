@@ -214,6 +214,7 @@ def seed_demo(engine, reference_date=None):
                 username=demo_username,
                 full_name="Demo User",
                 hashed_password=models.pwd_context.hash("demo123"),
+                role="manager",
             )
             db.add(demo_user)
             print(f"Utworzono domyślne konto demo: {demo_username} / demo123")
@@ -235,6 +236,51 @@ def seed_demo(engine, reference_date=None):
     return {"added_orders": added, "skipped_orders": skipped, "added_operators": added_operators}
 
 
+def seed_warehouse_demo(engine, reference_date=None):
+    """Optional complete demo: role accounts, stock and explicit sample order plans."""
+    from decimal import Decimal
+    from backend import warehouse
+    from backend.schemas import normalize_unit
+    reference = reference_date or datetime.now(timezone.utc).date()
+    initial = {('S235JR','kg'): ('100','20'), ('S235JR','szt'): ('20','5'),
+               ('S235JR','m'): ('10','3'), ('AISI 304','m'): ('8','2'),
+               ('AISI 304','szt'): ('10','2'), ('S355','m2'): ('5','2'), ('S355','kg'): ('80','20')}
+    with Session(engine, expire_on_commit=False) as db:
+        for username, password, full_name, role in [
+            ('kierownik_demo','KierownikDemo123!','Kierownik demonstracyjny','manager'),
+            ('operator_demo','OperatorDemo123!','Operator demonstracyjny','operator')]:
+            if not db.scalar(select(models.User).where(models.User.username == username)):
+                db.add(models.User(username=username, full_name=full_name, role=role,
+                                   hashed_password=models.pwd_context.hash(password)))
+        db.commit()
+        materials = {}
+        for (name, unit), (amount, minimum) in initial.items():
+            item = db.scalar(select(models.WarehouseMaterial).where(
+                models.WarehouseMaterial.name_key == name.casefold(), models.WarehouseMaterial.unit == unit))
+            if item is None:
+                item = warehouse.create_material(db, warehouse.MaterialCreate(name=name, unit=unit,
+                    opening_quantity=amount, minimum_quantity=minimum))
+            materials[(name, unit)] = item
+        templates = {(name, material): (Decimal(quantity.replace(',','.')), normalize_unit(unit))
+                     for name, material, quantity, unit, _ in PARTS}
+        planned = 0
+        for order in db.scalars(select(models.Order).where(models.Order.order_number.like('DEMO/%'),
+                models.Order.status.notin_([Status.COMPLETED, Status.ARCHIVED]))):
+            for part in order.parts:
+                template = templates.get((part.part_name, part.material))
+                if template and part.warehouse_material_id is None and part.planned_quantity is None:
+                    quantity, unit = template
+                    part.warehouse_material_id = materials[(part.material, unit)].id
+                    part.planned_quantity = quantity
+                    planned += 1
+        note = '[DEMO] Planowana dostawa stali'
+        if not db.scalar(select(models.WarehouseDelivery).where(models.WarehouseDelivery.note == note)):
+            db.add(models.WarehouseDelivery(material_id=materials[('S355','kg')].id, quantity=Decimal('10'),
+                expected_on=reference+timedelta(days=2), status='ordered', note=note))
+        db.commit()
+    return {'material_positions': len(materials), 'new_part_plans': planned}
+
+
 def backup_sqlite(engine):
     if not engine.url.database or engine.url.database == ":memory:":
         return None
@@ -252,6 +298,7 @@ def backup_sqlite(engine):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--backup-file", type=Path, help="Existing PostgreSQL pg_dump created before this command")
+    parser.add_argument("--with-warehouse", action="store_true", help="Add manager/operator demo accounts, stock and planned requirements")
     args = parser.parse_args()
     if database.engine.dialect.name == "sqlite":
         backup = backup_sqlite(database.engine)
@@ -266,6 +313,8 @@ def main():
         print(f"Backup: {backup}")
     initialize_database(database.engine)
     print(seed_demo(database.engine))
+    if args.with_warehouse:
+        print(seed_warehouse_demo(database.engine))
     with Session(database.engine) as db:
         orders = list(db.scalars(select(models.Order).where(models.Order.order_number.like(PREFIX + "%"))))
         print("Demo orders:", len(orders))

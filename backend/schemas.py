@@ -1,5 +1,6 @@
 """Input validation and the public API contract for weeks 1 to 3."""
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Annotated, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -119,6 +120,24 @@ class PartCreate(MaterialAmount):
     operator: Optional[str] = Field(default=None, max_length=255)
     client_key: Optional[str] = Field(default=None, max_length=100)
     steps: list[StepCreate] = Field(min_length=1)
+    warehouse_material_id: Optional[Identifier] = None
+    planned_quantity: Optional[Annotated[Decimal, Field(gt=0, le=Decimal('999999999.999999'), max_digits=15, decimal_places=6)]] = None
+    planned_for: Optional[date] = None
+
+    @field_validator("planned_quantity", mode="before")
+    @classmethod
+    def normalize_plan(cls, value):
+        if isinstance(value, bool):
+            raise ValueError("Zapotrzebowanie musi być liczbą")
+        return value.strip().replace(',', '.') if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def complete_plan(self):
+        if (self.warehouse_material_id is None) != (self.planned_quantity is None):
+            raise ValueError("Wybierz materiał z magazynu i podaj planowaną ilość")
+        if self.planned_for is not None and self.warehouse_material_id is None:
+            raise ValueError("Data zużycia wymaga materiału i planowanej ilości")
+        return self
 
     @model_validator(mode="after")
     def quantity_requires_material(self):
@@ -208,6 +227,11 @@ class PartResponse(ORMResponse):
     position: int = 0
     material: Optional[str] = None
     material_missing: bool = False
+    warehouse_material_id: Optional[int] = None
+    planned_quantity: Optional[Decimal] = None
+    planned_for: Optional[date] = None
+    planned_unit: Optional[str] = None
+    planned_material_name: Optional[str] = None
     material_quantity: Optional[float] = None
     material_unit: Optional[str] = None
     operator: Optional[str] = None

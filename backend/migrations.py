@@ -43,15 +43,19 @@ def initialize_database(engine):
 
     Base.metadata.create_all(bind=engine)
     additions = {
+        "users": {"role": "VARCHAR(20) NOT NULL DEFAULT 'operator'"},
         "orders": {"needs_correction": "BOOLEAN DEFAULT false", "status_changed_at": "TIMESTAMP",
                    "completed_at": "TIMESTAMP"},
         "order_parts": {"material": "VARCHAR", "material_missing": "BOOLEAN DEFAULT false",
                         "material_quantity": "DOUBLE PRECISION", "material_unit": "VARCHAR",
+                        "warehouse_material_id": "INTEGER", "planned_quantity": "NUMERIC(18,6)", "planned_for": "DATE",
                         "position": "INTEGER NOT NULL DEFAULT 0"},
         "process_steps": {"completed_at": "TIMESTAMP", "completed_by": "VARCHAR",
                           "production_notes": "TEXT", "material_used": "VARCHAR",
                           "material_quantity": "DOUBLE PRECISION", "material_unit": "VARCHAR",
                           "position": "INTEGER NOT NULL DEFAULT 0"},
+        "warehouse_movements": {"order_part_id": "INTEGER", "order_number": "VARCHAR(255) NOT NULL DEFAULT ''",
+                                "part_name": "VARCHAR(255) NOT NULL DEFAULT ''"},
     }
     with engine.begin() as connection:
         inspector = inspect(connection)
@@ -61,6 +65,9 @@ def initialize_database(engine):
             for column, sql_type in columns.items():
                 if column not in existing:
                     connection.execute(text(f'ALTER TABLE "{table}" ADD COLUMN "{column}" {sql_type}'))
+                    if table == "users" and column == "role":
+                        # Existing installation owner retains management access; other accounts are operators.
+                        connection.execute(text("UPDATE users SET role='manager' WHERE id=(SELECT MIN(id) FROM users)"))
                     if table == "order_parts" and column == "material_quantity":
                         part_usage_added = True
         # Run only when upgrading an old schema. A later cleared value stays cleared.

@@ -5,6 +5,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>WeldERP</title>
 	<link rel="stylesheet" href="/frontend/css/kanban.css">
+	<link rel="stylesheet" href="/frontend/css/material-plan.css">
 </head>
 <body>
 	<main class="page">
@@ -15,7 +16,7 @@
 			<div class="actions">
 				<button class="btn" onclick="openOperatorModal()">Operatorzy</button>
 				<button class="btn" type="button" onclick="window.location.href='/frontend/alerts.html'">Alerty</button>
-				<button class="btn" type="button" onclick="window.location.href='/frontend/warehouse.html'">Magazyn</button>
+				<button class="btn" type="button" data-manager-only hidden onclick="window.location.href='/frontend/warehouse.html'">Magazyn kierownika</button>
 				<button class="btn" type="button" id="refreshBtn">Odśwież</button>
 				<button class="btn" type="button" onclick="downloadAIReport()" >Raport AI</button>
 				<button class="btn btn-primary" type="button" id="newOrderBtn">+ Nowe zlecenie</button>
@@ -164,7 +165,8 @@
 		</div>
 	</div>
 
-	<script src="/frontend/js/api.js"></script>
+	<script src="/frontend/js/api.js?v=manager-planning-1"></script>
+	<script src="/frontend/js/material-plan.js"></script>
 <script>
 		async function checkAuth() {
 			const res = await fetch("/orders/");
@@ -305,6 +307,7 @@
 								${materialActionHtml}
 							</div>
 
+                            ${MaterialPlan.describe(part, order.date_deadline)}
                             <div class="part-material-usage" data-part-id="${part.id}">
                                 <div class="production-record-head"><strong>Zużycie materiału części</strong></div>
                                 <div class="production-material-info">Materiał części: <strong>${escapeHtml(part.material || 'Brak wpisanego materiału')}</strong></div>
@@ -348,6 +351,7 @@
 		}
 
 		async function switchToEditMode() {
+            await MaterialPlan.initialize();
     		const order = orders.find(o => o.id === currentOpenOrderId);
     		if (!order) return;
 			await refreshOperatorDropdowns();
@@ -435,6 +439,7 @@
 			`;
 
 			partEl.querySelector('.edit-part-operator').value = part.operator || "";
+            partEl.querySelector('.edit-part-material').parentElement.insertAdjacentElement('afterend', MaterialPlan.create(part));
 
 			partEl.querySelector('.remove-part-btn').addEventListener('click', () => {
 			   container.removeChild(partEl);
@@ -529,6 +534,7 @@
                     client_key: block.dataset.clientKey, part_name: partName,
                     material: block.querySelector('.edit-part-material').value.trim() || null,
                     operator: block.querySelector('.edit-part-operator').value || null,
+                    ...MaterialPlan.payload(block),
                     steps: rows.map(row => {
                         const name = row.querySelector('.edit-step-name').value.trim();
                         if (!name) throw new Error('Uzupełnij nazwę każdej operacji');

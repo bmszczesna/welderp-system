@@ -1,0 +1,38 @@
+name: codex-warehouse-preview
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: warehouse_test
+      POSTGRES_PASSWORD: warehouse_test
+      POSTGRES_DB: warehouse_preview
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warehouse_test -d warehouse_preview"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - warehouse_preview_data:/var/lib/postgresql/data
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - .:/app
+    ports:
+      - "127.0.0.1:8016:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://warehouse_test:warehouse_test@db:5432/warehouse_preview
+      GEMINI_API_KEY: ""
+      UPLOAD_DIR: /app/.test-artifacts/warehouse-preview-uploads
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 2s
+      timeout: 4s
+      retries: 30
+volumes:
+  warehouse_preview_data:

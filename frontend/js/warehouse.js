@@ -6,6 +6,7 @@
     const format = new Intl.NumberFormat('pl-PL', {maximumFractionDigits: 6});
     const kinds = {opening: 'Stan początkowy', receipt: 'Przyjęcie', issue: 'Rozchód'};
     let materials = [];
+    let materialLoadRevision = 0;
     let movementContext;
     let minimumId;
 
@@ -61,16 +62,21 @@
     }
 
     async function loadMaterials() {
+        const revision = ++materialLoadRevision;
         refresh.disabled = true;
         try {
-            materials = await WeldERP.request('/api/warehouse/materials');
+            const loaded = await WeldERP.request('/api/warehouse/materials');
+            if (revision !== materialLoadRevision) return false;
+            materials = loaded;
             render();
+            await WarehousePlanning.refresh(materials);
             return true;
         } catch (error) {
+            if (revision !== materialLoadRevision) return false;
             showMessage(`Nie udało się odświeżyć magazynu: ${error.message}`);
             if (!materials.length) rows.innerHTML = '<tr><td colspan="5" class="warehouse-empty">Nie można pobrać stanów. Spróbuj ponownie przyciskiem „Odśwież”.</td></tr>';
             return false;
-        } finally { refresh.disabled = false; }
+        } finally { if (revision === materialLoadRevision) refresh.disabled = false; }
     }
 
     async function submitForm(form, dialog, save, successText) {
@@ -114,6 +120,7 @@
         event.preventDefault();
         const form = event.currentTarget;
         const fields = {...Object.fromEntries(new FormData(form)), kind: movementContext.kind, request_id: movementContext.requestId};
+        fields.order_part_id = movementContext.kind === 'issue' && fields.order_part_id ? Number(fields.order_part_id) : null;
         submitForm(form, byId('movementDialog'), () => WeldERP.request(
             `/api/warehouse/materials/${movementContext.id}/movements`, WeldERP.json('POST', fields)),
             movementContext.kind === 'receipt' ? 'Przyjęcie zapisane' : 'Rozchód zapisany');
@@ -140,12 +147,12 @@
             try {
                 const history = await WeldERP.request(`/api/warehouse/materials/${item.id}/movements`);
                 byId('movementHistory').innerHTML = history.length ? `<table class="warehouse-table"><thead><tr>
-                    <th>Data</th><th>Rodzaj</th><th>Zmiana</th><th>Stan po ruchu</th><th>Uwagi</th>
+                    <th>Data</th><th>Rodzaj</th><th>Zmiana</th><th>Stan po ruchu</th><th>Zlecenie / uwagi</th>
                     </tr></thead><tbody>${history.map(entry => `<tr>
                         <td>${escape(new Date(entry.created_at + 'Z').toLocaleString('pl-PL'))}</td>
                         <td>${escape(kinds[entry.kind] || entry.kind)}</td>
                         <td>${Number(entry.quantity) > 0 ? '+' : ''}${escape(quantity(entry.quantity, item.unit))}</td>
-                        <td>${escape(quantity(entry.balance_after, item.unit))}</td><td>${escape(entry.note || '—')}</td>
+                        <td>${escape(quantity(entry.balance_after, item.unit))}</td><td>${escape([entry.order_number, entry.part_name, entry.note].filter(Boolean).join(' · ') || '—')}</td>
                     </tr>`).join('')}</tbody></table>` : '<p class="warehouse-help">Brak ruchów. Przyjmij pierwszą dostawę materiału.</p>';
             } catch (error) { byId('movementHistory').textContent = `Nie udało się pobrać historii: ${error.message}`; }
         } else if (action === 'minimum') {
@@ -156,6 +163,8 @@
             formError(form);
             byId('minimumDialog').showModal();
         } else {
+            try { await WarehousePlanning.prepareIssue(item.id, action); }
+            catch (error) { showMessage(error.message); return; }
             movementContext = {id: item.id, kind: action, requestId: WeldERP.clientKey()};
             const form = byId('movementForm');
             form.reset();
@@ -169,6 +178,15 @@
     });
 
     async function initialize() {
+        let user;
+        try { user = await WeldERP.getUser(); }
+        catch { window.location.replace('/'); return; }
+        if (user.role !== 'manager') {
+            document.body.innerHTML = '<main class="page"><h1>Magazyn kierownika</h1><p>Twoje konto operatora nie ma dostępu do stanów i prognoz magazynu.</p><p><a href="/kanban.html">Wróć do tablicy Kanban</a></p></main>';
+            return;
+        }
+        byId('warehousePage').hidden = false;
+        byId('warehouseUser').textContent = `${user.full_name} · kierownik`;
         try {
             const metadata = await WeldERP.request('/metadata/material-units');
             byId('materialUnit').innerHTML = metadata.units.map(unit => `<option value="${escape(unit)}">${escape(unit)}</option>`).join('');
@@ -179,5 +197,10 @@
         }
         await loadMaterials();
     }
+    window.addEventListener('warehouse:changed', () => loadMaterials());
+    byId('warehouseLogout').addEventListener('click', async () => {
+        await WeldERP.request('/logout/', {method: 'POST'});
+        window.location.href = '/';
+    });
     initialize();
 })();

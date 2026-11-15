@@ -5,7 +5,7 @@ import tempfile
 
 
 TABLES = ('operators', 'orders', 'order_parts', 'process_steps', 'part_pdfs', 'order_status_events',
-          'warehouse_materials', 'warehouse_movements')
+          'warehouse_materials', 'warehouse_movements', 'warehouse_deliveries')
 
 
 def main():

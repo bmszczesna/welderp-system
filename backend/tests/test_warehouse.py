@@ -12,6 +12,12 @@ from backend.migrations import initialize_database
 BASE = '/api/warehouse/materials'
 
 
+@pytest.fixture(autouse=True)
+def warehouse_manager(client):
+    client.post('/register/', json={'username': 'warehouse-manager', 'password': 'test-only', 'full_name': 'Kierownik testowy'})
+    assert client.post('/login/', json={'username': 'warehouse-manager', 'password': 'test-only'}).status_code == 200
+
+
 def material(client, quantity='10', **fields):
     response = client.post(BASE, json=dict(name='S235', unit='kg', opening_quantity=quantity,
                                           minimum_quantity='2', **fields))

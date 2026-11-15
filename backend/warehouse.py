@@ -1,5 +1,5 @@
 """Small warehouse ledger: explicit receipts/issues, exact amounts, no negative stock."""
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 import unicodedata
@@ -10,7 +10,7 @@ from pydantic import Field, field_validator
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from backend import models
+from backend import auth, models
 from backend.schemas import InputModel, ORMResponse, normalize_unit
 
 MAX_QUANTITY = Decimal("999999999.999999")
@@ -56,6 +56,7 @@ class MovementCreate(WarehouseInput):
     quantity: PositiveAmount
     note: Annotated[str, Field(max_length=500)] = ""
     request_id: Annotated[str, Field(min_length=1, max_length=100)] = Field(default_factory=lambda: str(uuid4()))
+    order_part_id: Annotated[int, Field(gt=0)] | None = None
 
 
 class MaterialResponse(ORMResponse):
@@ -75,6 +76,9 @@ class MovementResponse(ORMResponse):
     balance_after: Decimal
     note: str
     created_at: datetime
+    order_part_id: int | None = None
+    order_number: str = ""
+    part_name: str = ""
 
 
 def get_material(db, material_id):
@@ -114,17 +118,33 @@ def existing_movement(db, material_id, payload):
     if movement is None:
         return None
     delta = payload.quantity if payload.kind == "receipt" else -payload.quantity
-    if (movement.material_id, movement.kind, movement.quantity, movement.note) != (
-            material_id, payload.kind, delta, payload.note):
+    if (movement.material_id, movement.kind, movement.quantity, movement.note, movement.order_part_id) != (
+            material_id, payload.kind, delta, payload.note, payload.order_part_id):
         raise HTTPException(status_code=409, detail="To zgłoszenie zostało już zapisane z innymi danymi. Odśwież magazyn.")
     return movement
 
 
-def record_movement(db, material_id, payload):
+def record_movement(db, material_id, payload, commit=True):
     get_material(db, material_id)
     previous = existing_movement(db, material_id, payload)
     if previous is not None:
         return previous
+    part = None
+    if payload.order_part_id is not None:
+        if payload.kind != "issue":
+            raise HTTPException(status_code=422, detail="Do części przypisuje się rozchód materiału")
+        part = db.scalar(select(models.OrderPart).where(
+            models.OrderPart.id == payload.order_part_id).with_for_update().execution_options(populate_existing=True))
+        if part is None or part.warehouse_material_id != material_id:
+            raise HTTPException(status_code=422, detail="Część nie ma zaplanowanego tego materiału")
+        previous = existing_movement(db, material_id, payload)
+        if previous is not None:
+            return previous
+        if part.owner.status in (models.OrderStatus.COMPLETED, models.OrderStatus.ARCHIVED):
+            raise HTTPException(status_code=409, detail="Zlecenie jest już zakończone")
+        remaining = part.planned_quantity - issued_quantity(db, part.id)
+        if payload.quantity > remaining:
+            raise HTTPException(status_code=409, detail="Rozchód przekracza pozostałe zapotrzebowanie części")
     delta = payload.quantity if payload.kind == "receipt" else -payload.quantity
     # The stock check and update form one SQL operation, including concurrent issues.
     statement = update(models.WarehouseMaterial).where(models.WarehouseMaterial.id == material_id)
@@ -144,10 +164,16 @@ def record_movement(db, material_id, payload):
             detail = "Za mało materiału w magazynie" if delta < 0 else "Przyjęcie przekroczyłoby maksymalny stan magazynu"
             raise HTTPException(status_code=409, detail=detail)
         movement = models.WarehouseMovement(material_id=material_id, request_id=payload.request_id,
-                                            kind=payload.kind, quantity=delta, balance_after=balance, note=payload.note)
+                                            kind=payload.kind, quantity=delta, balance_after=balance, note=payload.note,
+                                            order_part_id=part.id if part else None,
+                                            order_number=part.owner.order_number if part else "",
+                                            part_name=part.part_name if part else "")
         db.add(movement)
-        db.commit()
-        db.refresh(movement)
+        if commit:
+            db.commit()
+            db.refresh(movement)
+        else:
+            db.flush()
     except IntegrityError:
         # A retry racing the original request must not create a second receipt/issue.
         db.rollback()
@@ -159,3 +185,43 @@ def record_movement(db, material_id, payload):
         db.rollback()
         raise
     return movement
+
+
+PLAN_FIELDS = ("warehouse_material_id", "planned_quantity", "planned_for")
+
+
+def issued_quantity(db, part_id):
+    if part_id is None:
+        return Decimal("0")
+    return -db.scalar(select(func.coalesce(func.sum(models.WarehouseMovement.quantity), 0)).where(
+        models.WarehouseMovement.order_part_id == part_id, models.WarehouseMovement.kind == "issue"))
+
+
+def apply_part_plan(db, part, data, user):
+    fields = set(PLAN_FIELDS) & data.model_fields_set
+    if not fields:
+        return
+    if part.id:
+        with db.no_autoflush:
+            db.scalar(select(models.OrderPart.id).where(models.OrderPart.id == part.id).with_for_update())
+            db.refresh(part, attribute_names=list(PLAN_FIELDS))
+    changed = any(getattr(part, field) != getattr(data, field) for field in fields)
+    if not changed:
+        return
+    auth.manager(user)
+    material_id = data.warehouse_material_id
+    planned = data.planned_quantity
+    if material_id is not None:
+        get_material(db, material_id)
+    issued = issued_quantity(db, part.id)
+    if issued and (material_id != part.warehouse_material_id or planned is None or planned < issued):
+        raise HTTPException(status_code=409, detail="Plan nie może usuwać ani zmieniać materiału już wydanego na tę część")
+    for field in PLAN_FIELDS:
+        setattr(part, field, getattr(data, field))
+    if part.id:
+        db.expire(part, ["planned_material"])
+
+
+def detach_part_history(db, part_id):
+    db.execute(update(models.WarehouseMovement).where(
+        models.WarehouseMovement.order_part_id == part_id).values(order_part_id=None))

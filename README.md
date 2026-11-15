@@ -32,29 +32,84 @@ z raportów Gemini, skopiuj `.env.example` do `.env` i ustaw własny
 Pliki `.env`, dane logowania i lokalne kopie bazy nie są publikowane.
 
 Przy pierwszym uruchomieniu zarejestruj własne konto przez formularz logowania.
+Pierwsze konto w pustej bazie otrzymuje rolę kierownika, kolejne rolę operatora.
+Przy aktualizacji starszej bazy kierownikiem zostaje najstarsze istniejące konto;
+hasła pozostają bez zmian. Sesja logowania trwa osiem godzin i jest weryfikowana
+po stronie serwera. Po aktualizacji zaloguj się ponownie.
 Obraz zawiera zależności WeasyPrint/Pango i fonty potrzebne do generowania PDF.
 
-## Prosty magazyn materiałów
+## Pełna wersja demonstracyjna od ekranu logowania
 
-Przycisk **Magazyn** na tablicy Kanban otwiera `/frontend/warehouse.html`.
+Przy działającym Docker Desktop uruchom z katalogu projektu:
+
+```powershell
+py scripts/prepare_preview.py
+```
+
+Otwórz http://127.0.0.1:8016/ i zaloguj się:
+
+| Konto | Login | Hasło demonstracyjne |
+| --- | --- | --- |
+| Kierownik | `kierownik_demo` | `KierownikDemo123!` |
+| Operator | `operator_demo` | `OperatorDemo123!` |
+
+Skrypt uruchamia osobny projekt Compose `codex-warehouse-preview`, dodaje brakujące
+przykładowe zlecenia, operatorów, materiały, plany zużycia i dostawę. Nie nadpisuje
+istniejących haseł ani stanów magazynowych. Dane pozostają w nazwanym woluminie
+`codex-warehouse-preview_warehouse_preview_data` między uruchomieniami.
+Przed uzupełnieniem danych istniejącej bazy powstaje pełna kopia w `backups/`.
+Pozostałe projekty Docker pozostają niezależne. Konta demonstracyjne służą do pracy lokalnej.
+
+Zatrzymanie i ponowny start gotowej wersji:
+
+```powershell
+docker compose -f docker-compose.preview.yml stop
+docker compose -f docker-compose.preview.yml up -d
+```
+
+## Magazyn kierownika i prognozy
+
+Przycisk **Magazyn kierownika** na tablicy Kanban otwiera `/frontend/warehouse.html`.
+Konto operatora nie widzi tego przycisku, a API magazynu odrzuca dostęp bez roli kierownika.
 Każda pozycja ma nazwę, jednostkę, bieżący stan i próg ostrzeżenia.
 
 1. Dodaj materiał, np. `S235JR`, jednostkę `kg`, stan początkowy `100` i minimum `20`.
 2. Dostawę zapisz przyciskiem **Przyjmij**, a zużycie produkcyjne przyciskiem **Wydaj**.
-3. **Historia** pokazuje przyjęcia, rozchody oraz stan po każdym ruchu. W uwagach można podać numer zlecenia.
+3. Przy wydaniu możesz wskazać część zlecenia: ten rozchód zmniejszy również jej pozostałe zapotrzebowanie.
+4. **Historia** pokazuje przyjęcia, rozchody, zlecenie i stan po każdym ruchu.
+
+Podczas dodawania lub edycji zlecenia kierownik może dla każdej części wybrać pozycję
+magazynową, planowaną ilość i opcjonalny dzień zużycia. Bez osobnej daty plan używa
+terminu realizacji zlecenia i podąża za jego zmianą. Zwykły opis materiału oraz zapis
+rzeczywistego zużycia na karcie części pozostają odrębnymi informacjami.
+
+Prognoza na 7, 14 lub 30 dni pokazuje stan na koniec jutra, pierwszy dzień wyczerpania
+zapasów, ilość do zamówienia i dzienny bilans. Uwzględnia bieżący stan, jeszcze
+niewydane planowane ilości aktywnych zleceń oraz zaplanowane dostawy. Zakończone
+i archiwalne zlecenia nie tworzą zapotrzebowania. Zaległe potrzeby trafiają na dziś;
+spóźnione dostawy są sygnalizowane i nie zwiększają prognozowanego stanu.
+Ostrzeżenie wskazuje części bez kompletnego planu, których potrzeb prognoza nie obejmuje.
+
+Ilość do zamówienia uzupełnia najniższy przewidywany stan na koniec dnia do ustawionego
+minimum w wybranym okresie. Planowanie nie uwzględnia terminów dostawców ani kolejności
+zdarzeń wewnątrz dnia. Plan dostawy jest wpisem w systemie; fizyczny stan zwiększa się
+dopiero po **Przyjmij dostawę**. Przyjęcie jest jednokrotne, a otrzymana dostawa przestaje
+być liczona jako przyszły przychód. Wysłanie zamówienia do dostawcy odbywa się poza aplikacją.
 
 Rozchód przekraczający dostępny stan jest odrzucany. Ilości przyjmują przecinek lub kropkę
 i maksymalnie sześć miejsc po przecinku. Materiał z taką samą nazwą i jednostką może wystąpić
 tylko raz; jednostki są normalizowane, ale nie są przeliczane między sobą.
 
-To wariant z ręcznymi ruchami: samo wpisanie zużycia w karcie części nie odejmuje materiału
+Ruchy pozostają ręczne: samo wpisanie zużycia w karcie części nie odejmuje materiału
 z magazynu. Rozchód należy zapisać w widoku magazynu. Ponowienie tego samego zgłoszenia
 przyjęcia lub rozchodu z tym samym `request_id` nie tworzy drugiego ruchu.
 Nowe tabele powstają automatycznie podczas startu aplikacji, z pustymi stanami.
 
 API magazynu: `GET/POST /api/warehouse/materials`,
 `POST/GET /api/warehouse/materials/{id}/movements`,
-`PATCH /api/warehouse/materials/{id}/minimum`.
+`PATCH /api/warehouse/materials/{id}/minimum`, `GET /api/warehouse/forecast`,
+`GET /api/warehouse/demands`, `GET/POST /api/warehouse/deliveries`,
+`POST /api/warehouse/deliveries/{id}/receive` i `/cancel`.
 
 ## Dane bazy
 
@@ -87,6 +142,10 @@ Dodanie stałego zestawu demonstracyjnego do działającego Docker Compose
 py scripts/load_demo_docker.py
 ```
 
+Dodaj `--with-warehouse`, aby dołączyć konta kierownika i operatora, pozycje magazynowe
+i plany materiałowe demonstracyjnych zleceń. Ten skrypt korzysta z podstawowego
+`docker-compose.yml`; do oddzielnego podglądu na porcie 8016 służy `prepare_preview.py`.
+
 Skrypt dodawania danych najpierw zapisuje pełną lokalną kopię PostgreSQL do
 ignorowanego katalogu `backups/`. Dane demonstracyjne są oznaczone `DEMO`.
 
@@ -118,6 +177,8 @@ Lokalne dane demonstracyjne SQLite można dodać poleceniem:
 ```powershell
 .\.venv\Scripts\python.exe -m backend.seed_demo
 ```
+
+Opcja `--with-warehouse` dodaje również demonstracyjny magazyn i plany materiałowe.
 
 Przed pierwszym startem nowej wersji wykonaj kopię dotychczasowej bazy i `uploads`.
 Przy starcie aplikacja addytywnie uzupełnia brakujące kolumny i tabele.

@@ -49,5 +49,18 @@ window.WeldERP = (() => {
         return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
     }
 
-    return {request, json, errorMessage, validatePDF, uploadPDF, clientKey, localDate};
+    let userPromise;
+    function getUser() {
+        userPromise ||= request('/auth/me');
+        return userPromise;
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        const controls = document.querySelectorAll('[data-manager-only]');
+        if (controls.length) getUser().then(user => controls.forEach(control => {
+            control.hidden = user.role !== 'manager';
+        })).catch(() => controls.forEach(control => { control.hidden = true; }));
+    });
+
+    return {request, json, errorMessage, validatePDF, uploadPDF, clientKey, localDate, getUser};
 })();

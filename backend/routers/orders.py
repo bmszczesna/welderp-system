@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from backend import database, file_storage, models, order_service as service, settings
+from backend import auth, database, file_storage, models, order_service as service, settings, warehouse
 from backend.models import OrderStatus
 from backend.schemas import MATERIAL_UNITS, OrderCreate, OrderResponse, OrderUpdate, StatusEventResponse
 
@@ -14,8 +14,8 @@ def material_units():
 
 
 @router.post("/orders/", status_code=201, tags=["Zlecenia"])
-def create_order(payload: OrderCreate, db: Session = Depends(database.get_db)):
-    order = service.create_order(db, payload)
+def create_order(payload: OrderCreate, db: Session = Depends(database.get_db), user=Depends(auth.optional_user)):
+    order = service.create_order(db, payload, user)
     return {"message": "Zlecenie utworzone", "order_id": order.id,
             "order_number": order.order_number, "parts": service.created_parts(order, payload)}
 
@@ -36,9 +36,9 @@ def order_history(order_id: int, db: Session = Depends(database.get_db)):
 
 
 @router.put("/orders/{order_id}", tags=["Zlecenia"])
-def update_order(order_id: int, payload: OrderUpdate, db: Session = Depends(database.get_db)):
+def update_order(order_id: int, payload: OrderUpdate, db: Session = Depends(database.get_db), user=Depends(auth.optional_user)):
     order = service.get_order(db, order_id)
-    paths = service.update_order(db, order, payload)
+    paths = service.update_order(db, order, payload, user)
     file_storage.remove_files(paths)
     return {"message": "Zlecenie zaktualizowane", "order_id": order.id,
             "parts": service.created_parts(order, payload)}
@@ -74,6 +74,8 @@ def delete_order(order_id: int, db: Session = Depends(database.get_db)):
     if order.status != OrderStatus.IN_QUEUE:
         raise HTTPException(status_code=400, detail="Można usunąć tylko zlecenie oczekujące")
     paths = [pdf.file_path for part in order.parts for pdf in part.pdfs]
+    for part in order.parts:
+        warehouse.detach_part_history(db, part.id)
     db.delete(order)
     service.commit(db)
     file_storage.remove_files(paths)

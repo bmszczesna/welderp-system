@@ -13,7 +13,7 @@ Wymagane są Git oraz działający Docker Desktop z Docker Compose.
 Pobierz aktualną gałąź projektu:
 
 ```powershell
-git clone --branch testy https://github.com/bmszczesna/welderp-system.git
+git clone --branch main https://github.com/bmszczesna/welderp-system.git
 cd welderp-system
 ```
 
@@ -33,6 +33,28 @@ Pliki `.env`, dane logowania i lokalne kopie bazy nie są publikowane.
 
 Przy pierwszym uruchomieniu zarejestruj własne konto przez formularz logowania.
 Obraz zawiera zależności WeasyPrint/Pango i fonty potrzebne do generowania PDF.
+
+## Prosty magazyn materiałów
+
+Przycisk **Magazyn** na tablicy Kanban otwiera `/frontend/warehouse.html`.
+Każda pozycja ma nazwę, jednostkę, bieżący stan i próg ostrzeżenia.
+
+1. Dodaj materiał, np. `S235JR`, jednostkę `kg`, stan początkowy `100` i minimum `20`.
+2. Dostawę zapisz przyciskiem **Przyjmij**, a zużycie produkcyjne przyciskiem **Wydaj**.
+3. **Historia** pokazuje przyjęcia, rozchody oraz stan po każdym ruchu. W uwagach można podać numer zlecenia.
+
+Rozchód przekraczający dostępny stan jest odrzucany. Ilości przyjmują przecinek lub kropkę
+i maksymalnie sześć miejsc po przecinku. Materiał z taką samą nazwą i jednostką może wystąpić
+tylko raz; jednostki są normalizowane, ale nie są przeliczane między sobą.
+
+To wariant z ręcznymi ruchami: samo wpisanie zużycia w karcie części nie odejmuje materiału
+z magazynu. Rozchód należy zapisać w widoku magazynu. Ponowienie tego samego zgłoszenia
+przyjęcia lub rozchodu z tym samym `request_id` nie tworzy drugiego ruchu.
+Nowe tabele powstają automatycznie podczas startu aplikacji, z pustymi stanami.
+
+API magazynu: `GET/POST /api/warehouse/materials`,
+`POST/GET /api/warehouse/materials/{id}/movements`,
+`PATCH /api/warehouse/materials/{id}/minimum`.
 
 ## Dane bazy
 

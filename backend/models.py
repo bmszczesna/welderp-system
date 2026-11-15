@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Float, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, Float, Text, Numeric, CheckConstraint, UniqueConstraint
 from sqlalchemy.orm import relationship
 from backend.database import Base
 import datetime
@@ -7,6 +7,8 @@ import enum
 from passlib.context import CryptContext
 from pathlib import Path
 from urllib.parse import quote
+from decimal import Decimal
+from uuid import uuid4
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -117,3 +119,41 @@ class Operator(Base):
     __tablename__ = "operators"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, unique=True, nullable=False)
+
+
+class WarehouseMaterial(Base):
+    __tablename__ = "warehouse_materials"
+    __table_args__ = (
+        UniqueConstraint("name_key", "unit", name="uq_warehouse_material_unit"),
+        CheckConstraint("quantity >= 0 AND quantity <= 999999999.999999", name="ck_warehouse_quantity"),
+        CheckConstraint("minimum_quantity >= 0 AND minimum_quantity <= 999999999.999999", name="ck_warehouse_minimum"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(150), nullable=False)
+    name_key = Column(String(512), nullable=False)
+    unit = Column(String(20), nullable=False)
+    quantity = Column(Numeric(18, 6), nullable=False, default=Decimal("0"))
+    minimum_quantity = Column(Numeric(18, 6), nullable=False, default=Decimal("0"))
+
+    @property
+    def is_low_stock(self):
+        return self.quantity <= self.minimum_quantity
+
+
+class WarehouseMovement(Base):
+    __tablename__ = "warehouse_movements"
+    __table_args__ = (
+        CheckConstraint("quantity != 0", name="ck_warehouse_movement_nonzero"),
+        CheckConstraint("balance_after >= 0", name="ck_warehouse_movement_balance"),
+        CheckConstraint("kind IN ('opening', 'receipt', 'issue')", name="ck_warehouse_movement_kind"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    material_id = Column(Integer, ForeignKey("warehouse_materials.id"), nullable=False, index=True)
+    request_id = Column(String(100), nullable=False, unique=True, default=lambda: str(uuid4()))
+    kind = Column(String(20), nullable=False)
+    quantity = Column(Numeric(18, 6), nullable=False)
+    balance_after = Column(Numeric(18, 6), nullable=False)
+    note = Column(String(500), nullable=False, default="")
+    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)

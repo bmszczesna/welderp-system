@@ -19,7 +19,7 @@ from backend import database, models, settings
 from backend.integrations import HTML, get_ai_model
 from backend.migrations import initialize_database
 from backend.models import OrderStatus
-from backend.routers import alerts, orders, production, users
+from backend.routers import alerts, orders, production, users, warehouse
 
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -35,6 +35,7 @@ app.include_router(orders.router)
 app.include_router(production.router)
 app.include_router(users.router)
 app.include_router(alerts.router)
+app.include_router(warehouse.router)
 app.mount("/frontend", StaticFiles(directory=settings.ROOT_DIR / "frontend"), name="frontend")
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 

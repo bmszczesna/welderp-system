@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magazyn - WeldERP</title>
+    <link rel="stylesheet" href="/frontend/css/kanban.css">
+    <link rel="stylesheet" href="/frontend/css/warehouse.css">
+</head>
+<body>
+<main class="page warehouse-page">
+    <header class="topbar">
+        <div>
+            <p class="warehouse-eyebrow">WeldERP / materiały</p>
+            <h1 class="title">Magazyn</h1>
+            <p class="warehouse-subtitle">Rejestruj dostawy jako przyjęcia, a zużycie produkcyjne jako rozchody.</p>
+        </div>
+        <nav class="actions" aria-label="Nawigacja magazynu">
+            <a class="btn" href="/kanban.html">Tablica Kanban</a>
+            <a class="btn" href="/frontend/alerts.html">Alerty</a>
+            <button class="btn" id="refreshWarehouse" type="button">Odśwież</button>
+            <button class="btn btn-primary" id="addMaterial" type="button">+ Dodaj materiał</button>
+        </nav>
+    </header>
+
+    <section class="warehouse-summary" aria-label="Podsumowanie magazynu">
+        <div><span>Pozycje materiałowe</span><strong id="materialCount">—</strong></div>
+        <div><span>Niski stan</span><strong id="lowStockCount">—</strong></div>
+        <div><span>Brak na stanie</span><strong id="emptyStockCount">—</strong></div>
+    </section>
+    <p class="message" id="warehouseMessage" role="status" hidden></p>
+
+    <section class="warehouse-panel" aria-labelledby="stockHeading">
+        <div class="warehouse-toolbar">
+            <div><h2 id="stockHeading">Stany materiałów</h2><p>Każda pozycja ma własną jednostkę i historię ruchów.</p></div>
+            <label class="warehouse-search">Szukaj materiału
+                <input class="search" type="search" id="materialSearch" placeholder="np. S235, profil, blacha">
+            </label>
+        </div>
+        <div class="warehouse-table-wrap">
+            <table class="warehouse-table">
+                <thead><tr><th>Materiał</th><th>Stan</th><th>Minimum</th><th>Status</th><th>Działania</th></tr></thead>
+                <tbody id="warehouseRows"><tr><td colspan="5" class="warehouse-empty">Ładowanie materiałów…</td></tr></tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<dialog id="createMaterialDialog" class="warehouse-dialog" aria-labelledby="createMaterialHeading">
+    <form id="createMaterialForm">
+        <h2 id="createMaterialHeading">Nowy materiał</h2>
+        <p class="warehouse-help">Nazwa i jednostka identyfikują pozycję. Kolejne dostawy dodasz przyciskiem „Przyjmij”.</p>
+        <label>Nazwa materiału<input id="materialName" name="name" maxlength="150" required placeholder="np. Stal S235JR"></label>
+        <label>Jednostka<select id="materialUnit" name="unit" required><option value="">Ładowanie jednostek…</option></select></label>
+        <div class="warehouse-form-grid">
+            <label>Stan początkowy<input name="opening_quantity" inputmode="decimal" value="0" required></label>
+            <label>Stan minimalny<input name="minimum_quantity" inputmode="decimal" value="0" required></label>
+        </div>
+        <p class="warehouse-help">Minimum oznacza próg ostrzeżenia o niskim stanie. Ilość możesz wpisać z przecinkiem, np. 12,5.</p>
+        <p class="warehouse-form-error" role="alert" hidden></p>
+        <div class="warehouse-dialog-actions"><button class="btn" type="button" data-close>Anuluj</button><button class="btn btn-primary" type="submit">Dodaj materiał</button></div>
+    </form>
+</dialog>
+
+<dialog id="movementDialog" class="warehouse-dialog" aria-labelledby="movementHeading">
+    <form id="movementForm">
+        <h2 id="movementHeading">Ruch magazynowy</h2>
+        <p id="movementMaterial" class="warehouse-material-heading"></p>
+        <p id="movementAvailable" class="warehouse-help"></p>
+        <label id="movementQuantityLabel">Ilość<input name="quantity" inputmode="decimal" placeholder="np. 12,5" required></label>
+        <label>Uwagi / numer zlecenia <span class="warehouse-optional">(opcjonalnie)</span><textarea name="note" maxlength="500" rows="3" placeholder="np. Dostawa profili lub zużycie na ZL/001"></textarea></label>
+        <p class="warehouse-form-error" role="alert" hidden></p>
+        <div class="warehouse-dialog-actions"><button class="btn" type="button" data-close>Anuluj</button><button class="btn btn-primary" id="saveMovement" type="submit">Zapisz</button></div>
+    </form>
+</dialog>
+
+<dialog id="minimumDialog" class="warehouse-dialog" aria-labelledby="minimumHeading">
+    <form id="minimumForm">
+        <h2 id="minimumHeading">Stan minimalny</h2>
+        <p id="minimumMaterial" class="warehouse-material-heading"></p>
+        <label>Próg ostrzeżenia<input name="minimum_quantity" inputmode="decimal" required></label>
+        <p class="warehouse-help">Materiał otrzyma oznaczenie „Niski stan”, gdy dostępna ilość spadnie do tego poziomu.</p>
+        <p class="warehouse-form-error" role="alert" hidden></p>
+        <div class="warehouse-dialog-actions"><button class="btn" type="button" data-close>Anuluj</button><button class="btn btn-primary" type="submit">Zapisz minimum</button></div>
+    </form>
+</dialog>
+
+<dialog id="historyDialog" class="warehouse-dialog warehouse-history-dialog" aria-labelledby="historyHeading">
+    <h2 id="historyHeading">Historia ruchów</h2>
+    <p id="historyMaterial" class="warehouse-material-heading"></p>
+    <p class="warehouse-help">100 ostatnich ruchów, od najnowszego. Stan początkowy jest osobnym wpisem.</p>
+    <div id="movementHistory" class="warehouse-table-wrap"></div>
+    <div class="warehouse-dialog-actions"><button class="btn" type="button" data-close>Zamknij</button></div>
+</dialog>
+<script src="/frontend/js/api.js"></script>
+<script src="/frontend/js/warehouse.js"></script>
+</body>
+</html>

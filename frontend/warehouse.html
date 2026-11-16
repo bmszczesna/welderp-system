@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Magazyn - WeldERP</title>
     <link rel="stylesheet" href="/frontend/css/kanban.css">
-    <link rel="stylesheet" href="/frontend/css/warehouse.css?v=rezerwacje-1">
+    <link rel="stylesheet" href="/frontend/css/warehouse.css?v=kalendarz-1">
 </head>
 <body>
 <main class="page warehouse-page" id="warehousePage" hidden>
@@ -35,16 +35,23 @@
     <section class="warehouse-panel warehouse-planning-panel" aria-labelledby="forecastHeading">
         <div class="warehouse-toolbar">
             <div><h2 id="forecastHeading">Prognoza i domówienia</h2>
-                <p>Stan na koniec dnia, przy założeniu zużycia zgodnie z planami i terminowego przyjazdu dostaw.</p></div>
-            <label class="warehouse-search">Okres prognozy<select id="forecastHorizon" class="search">
-                <option value="7">7 dni</option><option value="14">14 dni</option><option value="30">30 dni</option>
-            </select></label>
+                <p>Wybierz dzień w kalendarzu. Zobaczysz przewidywany stan na koniec tego dnia.</p></div>
+            <div class="warehouse-forecast-controls">
+                <label class="warehouse-search">Prognoza na dzień<input id="forecastDate" class="search" type="date" required></label>
+                <div class="warehouse-forecast-shortcuts" aria-label="Szybki wybór daty">
+                    <button class="btn" type="button" data-forecast-offset="0" aria-pressed="false">Dziś</button>
+                    <button class="btn" type="button" data-forecast-offset="7" aria-pressed="true">Za 7 dni</button>
+                    <button class="btn" type="button" data-forecast-offset="14" aria-pressed="false">Za 14 dni</button>
+                    <button class="btn" type="button" data-forecast-offset="30" aria-pressed="false">Za 30 dni</button>
+                </div>
+            </div>
         </div>
+        <p id="forecastRange" class="warehouse-help warehouse-panel-note" role="status"></p>
         <p id="forecastWarning" class="warehouse-forecast-warning" role="status" hidden></p>
         <div class="warehouse-table-wrap"><table class="warehouse-table"><thead><tr>
-            <th>Materiał</th><th>Teraz</th><th>Stan jutro</th><th>Wyczerpanie zapasu</th><th>Do domówienia</th><th>Plan</th>
+            <th>Materiał</th><th>Teraz</th><th id="forecastDateColumn">Stan na wybrany dzień</th><th>Wyczerpanie zapasu do tej daty</th><th>Do domówienia do tej daty</th><th>Plan</th>
         </tr></thead><tbody id="forecastRows"><tr><td colspan="6" class="warehouse-empty">Ładowanie prognozy…</td></tr></tbody></table></div>
-        <p class="warehouse-help warehouse-panel-note">Sugestia domówienia uzupełnia najniższy przewidywany stan do ustalonego minimum. Szczegóły pokazują potrzeby i dostawy każdego dnia.</p>
+        <p class="warehouse-help warehouse-panel-note">Liczymy wszystkie potrzeby i dostawy od dziś do wybranego dnia, zgodnie z wpisanymi terminami. Sugestia domówienia uwzględnia także wcześniejsze braki i zapas minimalny. Szczegóły pokazują bilans każdego dnia.</p>
     </section>
 
     <section class="warehouse-panel" aria-labelledby="stockHeading">
@@ -138,7 +145,7 @@
     <div class="warehouse-dialog-actions"><button class="btn" type="button" data-close>Zamknij</button></div>
 </dialog>
 <script src="/frontend/js/api.js?v=manager-planning-1"></script>
-<script src="/frontend/js/warehouse-planning.js?v=rezerwacje-1"></script>
+<script src="/frontend/js/warehouse-planning.js?v=kalendarz-2"></script>
 <script src="/frontend/js/warehouse.js?v=rezerwacje-1"></script>
 </body>
 </html>

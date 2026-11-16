@@ -44,8 +44,14 @@ def list_movements(material_id: int, limit: int = Query(default=100, ge=1, le=20
 
 @router.get("/forecast", response_model=forecast.ForecastResponse)
 def get_forecast(as_of: date | None = None, days: int = Query(default=7, ge=1, le=90),
+                 target_date: date | None = None,
                  db: Session = Depends(database.get_db)):
-    return forecast.calculate_forecast(db, as_of or date.today(), days)
+    base_date = as_of or date.today()
+    if target_date is not None:
+        days = (target_date - base_date).days
+        if not 0 <= days <= 365:
+            raise HTTPException(status_code=422, detail='Wybierz datę od dzisiaj do 365 dni naprzód. Prognoza korzysta z aktualnego stanu magazynu.')
+    return forecast.calculate_forecast(db, base_date, days)
 
 
 @router.get("/demands", response_model=forecast.DemandList)

@@ -93,8 +93,12 @@ nie zabiera zapasu innym. Zmniejszenie potrzeb, usunięcie części lub zlecenia
 zlecenia zwalniają rezerwację. Wydanie na część jednocześnie zmniejsza stan, jej rezerwację
 i pozostałe zapotrzebowanie. Rozchód ogólny może pobrać wyłącznie wolny materiał.
 
-Prognoza na 7, 14 lub 30 dni pokazuje stan na koniec jutra, pierwszy dzień wyczerpania
-zapasów, ilość do zamówienia i dzienny bilans. Uwzględnia bieżący stan, jeszcze
+Datę prognozy wybiera się w kalendarzu, od dziś do 365 dni naprzód. Przyciski „Dziś”,
+„Za 7 dni”, „Za 14 dni” i „Za 30 dni” pozwalają szybko ustawić datę. Tabela pokazuje
+stan na koniec wybranego dnia, pierwszy dzień wyczerpania zapasów do tej daty,
+ilość do zamówienia i dzienny bilans w szczegółach. Wynik uwzględnia wszystkie
+potrzeby i dostawy od dziś do wybranej daty włącznie, a nie tylko zdarzenia z tego dnia.
+Uwzględnia bieżący stan, jeszcze
 niewydane potrzebne ilości aktywnych zleceń oraz zaplanowane dostawy. Zużycie jest
 prognozowane według terminu zlecenia; rezerwacja nie czeka na tę datę. Zakończone
 i archiwalne zlecenia nie tworzą zapotrzebowania. Zaległe potrzeby trafiają na dziś;
@@ -103,7 +107,9 @@ Ostrzeżenie wskazuje części bez kompletnego planu, których potrzeb prognoza 
 
 Ilość do zamówienia uzupełnia najniższy przewidywany stan na koniec dnia do ustawionego
 minimum w wybranym okresie. Planowanie nie uwzględnia terminów dostawców ani kolejności
-zdarzeń wewnątrz dnia. Plan dostawy jest wpisem w systemie; fizyczny stan zwiększa się
+zdarzeń wewnątrz dnia. Jeśli zapas wyczerpie się wcześniej, a późniejsza dostawa go
+uzupełni, sugestia nadal uwzględnia wcześniejszy brak. Plan dostawy jest wpisem w systemie;
+fizyczny stan zwiększa się
 dopiero po **Przyjmij dostawę**. Przyjęcie jest jednokrotne, a otrzymana dostawa przestaje
 być liczona jako przyszły przychód. Wysłanie zamówienia do dostawcy odbywa się poza aplikacją.
 
@@ -121,6 +127,11 @@ API magazynu: `GET/POST /api/warehouse/materials`,
 `PATCH /api/warehouse/materials/{id}/minimum`, `GET /api/warehouse/forecast`,
 `GET /api/warehouse/demands`, `GET/POST /api/warehouse/deliveries`,
 `POST /api/warehouse/deliveries/{id}/receive` i `/cancel`.
+
+Prognoza na konkretny dzień: `GET /api/warehouse/forecast?target_date=YYYY-MM-DD`.
+Starszy parametr `days` pozostaje obsługiwany. Widok części rozróżnia rezerwację,
+wydania zapisane w magazynie i zużycie zapisane w produkcji. Zamknięte zlecenia
+nie pokazują wezwania do uzupełniania powiązania z magazynem.
 
 ## Dane bazy
 

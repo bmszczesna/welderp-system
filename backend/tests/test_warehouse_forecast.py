@@ -284,3 +284,78 @@ def test_full_demo_has_roles_and_complete_material_plans(db_engine):
         from backend.warehouse_forecast import calculate_forecast
         result=calculate_forecast(db,DAY,7)
         assert result.unplanned_parts==0
+
+
+def selected_forecast(client, item_id, offset):
+    response=client.get(BASE+'/forecast',params={'as_of':DAY.isoformat(),
+        'target_date':(DAY+timedelta(days=offset)).isoformat()})
+    assert response.status_code==200,response.text
+    data=response.json()
+    return data,next(item for item in data['items'] if item['material_id']==item_id)
+
+
+def test_selected_date_includes_all_events_until_that_day(manager,order_payload):
+    item_id=material(manager)
+    for quantity,due in [('40',1),('50',2),('30',4),('300',5)]:
+        order(manager,order_payload,item_id,quantity,due)
+    delivery(manager,item_id,'10',3)
+    delivery(manager,item_id,'1000',5)
+    data,item=selected_forecast(manager,item_id,4)
+    assert data['as_of']==DAY.isoformat()
+    assert data['target_date']==(DAY+timedelta(days=4)).isoformat()
+    assert data['horizon_days']==4 and len(item['days'])==5
+    assert number(item['target_quantity'])==-10
+    assert number(item['suggested_order_quantity'])==30
+    assert item['depletion_on']==data['target_date']
+    assert number(item['days'][-1]['projected_quantity'])==-10
+
+
+def test_delivery_before_selected_date_is_not_treated_as_overdue(manager,order_payload):
+    item_id=material(manager)
+    order(manager,order_payload,item_id,'60',1)
+    delivery(manager,item_id,'40',2)
+    data,item=selected_forecast(manager,item_id,3)
+    assert data['overdue_deliveries']==0
+    assert number(item['target_quantity'])==80
+    assert number(item['days'][2]['receipt_quantity'])==40
+
+
+def test_today_selection_does_not_include_tomorrows_shortage(manager,order_payload):
+    item_id=material(manager)
+    order(manager,order_payload,item_id,'50',0)
+    order(manager,order_payload,item_id,'80',1)
+    delivery(manager,item_id,'20',0)
+    data,item=selected_forecast(manager,item_id,0)
+    assert data['horizon_days']==0 and data['target_date']==DAY.isoformat()
+    assert len(item['days'])==1
+    assert number(item['target_quantity'])==70
+    assert number(item['tomorrow_quantity'])==-10
+    assert item['depletion_on'] is None and item['shortage_on'] is None
+    assert number(item['suggested_order_quantity'])==0
+
+
+def test_purchase_suggestion_covers_shortage_before_selected_date(manager,order_payload):
+    item_id=material(manager,quantity='30')
+    order(manager,order_payload,item_id,'50',1)
+    delivery(manager,item_id,'100',3)
+    _,item=selected_forecast(manager,item_id,3)
+    assert number(item['target_quantity'])==80
+    assert number(item['suggested_order_quantity'])==40
+    assert item['shortage_on']==(DAY+timedelta(days=1)).isoformat()
+
+
+@pytest.mark.parametrize('offset',[-1,366])
+def test_selected_date_outside_supported_range_rejected(manager,offset):
+    response=manager.get(BASE+'/forecast',params={'as_of':DAY.isoformat(),
+        'target_date':(DAY+timedelta(days=offset)).isoformat()})
+    assert response.status_code==422
+    assert '365 dni' in response.json()['detail']
+
+
+def test_forecast_supports_a_date_one_year_ahead(manager):
+    item_id=material(manager)
+    before=manager.get(BASE+'/materials').json()
+    data,item=selected_forecast(manager,item_id,365)
+    assert data['horizon_days']==365 and len(item['days'])==366
+    assert number(item['target_quantity'])==100
+    assert manager.get(BASE+'/materials').json()==before

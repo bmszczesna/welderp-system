@@ -20,6 +20,11 @@
 .warehouse-toolbar { display: flex; gap: 22px; justify-content: space-between; align-items: center; padding: 22px; }
 .warehouse-toolbar h2 { margin: 0 0 7px; font-size: 18px; }
 .warehouse-toolbar p { margin: 0; font-size: 13px; color: var(--muted); }
+.warehouse-forecast-controls { width: 310px; max-width: 100%; flex-shrink: 0; }
+.warehouse-forecast-controls .warehouse-search { width: 100%; }
+.warehouse-forecast-shortcuts { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.warehouse-forecast-shortcuts .btn { padding: 6px 8px; font-size: 12px; }
+.warehouse-forecast-shortcuts .btn[aria-pressed="true"] { color: #1e40af; border-color: #93c5fd; background: #eff6ff; }
 .warehouse-search { display: grid; gap: 6px; width: 290px; max-width: 100%; font-size: 12px; color: var(--muted); }
 .warehouse-table-wrap { overflow-x: auto; }
 .warehouse-table { width: 100%; border-collapse: collapse; font-size: 14px; }

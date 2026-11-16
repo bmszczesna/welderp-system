@@ -5,7 +5,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>WeldERP</title>
 	<link rel="stylesheet" href="/frontend/css/kanban.css">
-	<link rel="stylesheet" href="/frontend/css/material-plan.css?v=rezerwacje-1">
+	<link rel="stylesheet" href="/frontend/css/material-plan.css?v=komunikaty-1">
 </head>
 <body>
 	<main class="page">
@@ -166,7 +166,7 @@
 	</div>
 
 	<script src="/frontend/js/api.js?v=manager-planning-1"></script>
-	<script src="/frontend/js/material-plan.js?v=rezerwacje-1"></script>
+	<script src="/frontend/js/material-plan.js?v=komunikaty-1"></script>
 <script>
 		async function checkAuth() {
 			const res = await fetch("/orders/");
@@ -279,7 +279,7 @@
 			} else if (readOnly) {
 				productionHint = 'Zlecenie jest zakończone. Rejestr produkcji jest dostępny tylko do odczytu.';
 			}
-			let partsHtml = (order.material_warnings || []).map(text => `<p class="material-shortage">${escapeHtml(text)}</p>`).join('');
+			let partsHtml = order.materials_ready ? '' : '<p class="material-shortage">Zlecenie czeka na uzupełnienie materiałów. Szczegóły braków podano przy częściach.</p>';
             partsHtml += productionHint ? `<p class="production-hint" style="font-size:13px; color:#4b5563;">${productionHint}</p>` : '';
 			partsHtml += `<ol class="modal-parts-list" style="padding-left: 20px; list-style-type: decimal;">`;
 
@@ -308,10 +308,11 @@
 								${materialActionHtml}
 							</div>
 
-                            ${MaterialPlan.describe(part, order.date_deadline)}
+                            ${MaterialPlan.describe(part, order.status)}
                             <div class="part-material-usage" data-part-id="${part.id}">
-                                <div class="production-record-head"><strong>Zużycie materiału części</strong></div>
-                                <div class="production-material-info">Materiał części: <strong>${escapeHtml(part.material || 'Brak wpisanego materiału')}</strong></div>
+                                <div class="production-record-head"><strong>Zużycie zapisane w produkcji</strong></div>
+                                <div class="production-material-info">Materiał: <strong>${escapeHtml(part.material || 'Brak wpisanego materiału')}</strong></div>
+                                <p class="production-hint">${readOnly ? 'To zapis produkcyjny. Historia wydań z magazynu jest prowadzona osobno.' : 'Ten zapis nie zmienia stanu ani rezerwacji w magazynie. Pobranie materiału zapisz w magazynie przyciskiem „Wydaj”.'}</p>
                                 <div class="production-grid">
                                     <label>Zużyta ilość
                                         <input type="text" inputmode="decimal" class="part-material-quantity" value="${escapeHtml(part.material_quantity ?? '')}" placeholder="np. 1,25" ${canRecordProduction ? '' : 'disabled'}>
@@ -320,7 +321,7 @@
                                         <input type="text" class="part-material-unit" list="materialUnits" value="${escapeHtml(part.material_unit || '')}" placeholder="kg / szt." ${canRecordProduction ? '' : 'disabled'}>
                                     </label>
                                 </div>
-                                ${canRecordProduction ? `<button type="button" class="btn production-save-btn" onclick="savePartMaterialUsage(${part.id}, this.closest('.part-material-usage'))">Zapisz zużycie</button>` : ''}
+                                ${canRecordProduction ? `<button type="button" class="btn production-save-btn" onclick="savePartMaterialUsage(${part.id}, this.closest('.part-material-usage'))">Zapisz zużycie w produkcji</button>` : ''}
                             </div>
 							<ol class="modal-steps-list" style="margin-top: 5px; padding-left: 30px;">
 									${part.steps.map(step => {

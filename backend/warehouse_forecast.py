@@ -41,6 +41,7 @@ class MaterialForecast(BaseModel):
     current_quantity: Decimal
     minimum_quantity: Decimal
     tomorrow_quantity: Decimal
+    target_quantity: Decimal
     depletion_on: date | None
     shortage_on: date | None
     suggested_order_quantity: Decimal
@@ -50,6 +51,7 @@ class MaterialForecast(BaseModel):
 class ForecastResponse(BaseModel):
     as_of: date
     horizon_days: int
+    target_date: date
     unplanned_parts: int
     overdue_deliveries: int
     items: list[MaterialForecast]
@@ -101,7 +103,9 @@ def calculate_forecast(db, as_of, horizon_days):
     demands, unplanned = active_demands(db)
     need = defaultdict(lambda: Decimal("0"))
     incoming = defaultdict(lambda: Decimal("0"))
-    until = as_of + timedelta(days=horizon_days)
+    # Keep the legacy tomorrow value even when the selected date is today.
+    calculated_days = max(1, horizon_days)
+    until = as_of + timedelta(days=calculated_days)
     for demand in demands:
         if demand['needed_on'] <= until:
             need[(demand['material_id'], max(as_of, demand['needed_on']))] += demand['remaining_quantity']
@@ -117,20 +121,24 @@ def calculate_forecast(db, as_of, horizon_days):
         lowest = None
         depletion = shortage = None
         days = []
-        for offset in range(horizon_days + 1):
+        for offset in range(calculated_days + 1):
             day = as_of + timedelta(days=offset)
             requested, supplied = need[(material.id, day)], incoming[(material.id, day)]
             balance += supplied - requested
-            lowest = balance if lowest is None else min(lowest, balance)
-            if balance <= 0 and depletion is None:
-                depletion = day
-            if balance < 0 and shortage is None:
-                shortage = day
+            if offset <= horizon_days:
+                lowest = balance if lowest is None else min(lowest, balance)
+                if balance <= 0 and depletion is None:
+                    depletion = day
+                if balance < 0 and shortage is None:
+                    shortage = day
             days.append(ForecastDay(day=day, demand_quantity=requested, receipt_quantity=supplied,
                                     projected_quantity=balance))
         items.append(MaterialForecast(material_id=material.id, name=material.name, unit=material.unit,
             current_quantity=material.quantity, minimum_quantity=material.minimum_quantity,
             tomorrow_quantity=days[1].projected_quantity, depletion_on=depletion, shortage_on=shortage,
-            suggested_order_quantity=max(Decimal("0"), material.minimum_quantity - lowest), days=days))
+            target_quantity=days[horizon_days].projected_quantity,
+            suggested_order_quantity=max(Decimal("0"), material.minimum_quantity - lowest),
+            days=days[:horizon_days + 1]))
     return ForecastResponse(as_of=as_of, horizon_days=horizon_days, unplanned_parts=unplanned,
+                            target_date=as_of + timedelta(days=horizon_days),
                             overdue_deliveries=overdue, items=items)

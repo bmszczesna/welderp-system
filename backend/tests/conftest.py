@@ -32,8 +32,21 @@ def client(db_engine):
 
 
 @pytest.fixture
-def order_payload():
+def order_payload(client, db_engine):
+    from decimal import Decimal
+    from sqlalchemy.orm import Session
+    from backend import models
+    if client.get('/auth/me').status_code != 200:
+        client.post('/register/', json={'username':'order-test-owner','password':'test','full_name':'Kierownik testowy'})
+        client.post('/login/', json={'username':'order-test-owner','password':'test'})
+    with Session(db_engine) as db:
+        item=models.WarehouseMaterial(name='S235 (testy)',name_key='s235 (testy)',unit='kg',
+                                      quantity=Decimal('1000'),minimum_quantity=Decimal('0'))
+        db.add(item)
+        db.commit()
+        item_id=item.id
     return {"order_number": "ZL/TEST", "client_name": "Klient testowy",
             "date_received": "2026-10-20T00:00:00", "date_deadline": "2026-10-25T00:00:00",
             "parts": [{"client_key": "part-1", "part_name": "Rama", "material": "S235",
+                       "warehouse_material_id":item_id,"planned_quantity":"10",
                        "steps": [{"step_name": "Spawanie"}]}]}

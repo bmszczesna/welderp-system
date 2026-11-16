@@ -36,6 +36,8 @@ def order(client, payload, item_id=None, quantity=None, due=1, planned_for=None)
     data = deepcopy(payload)
     data.update(order_number='PLAN/'+uuid4().hex[:10], date_received=(DAY-timedelta(days=10)).isoformat()+'T00:00:00',
                 date_deadline=(DAY+timedelta(days=due)).isoformat()+'T00:00:00')
+    for key in ('warehouse_material_id','planned_quantity','planned_for'):
+        data['parts'][0].pop(key, None)
     if item_id is not None:
         data['parts'][0].update(warehouse_material_id=item_id, planned_quantity=quantity,
                                 planned_for=planned_for.isoformat() if planned_for else None)
@@ -236,16 +238,18 @@ def test_legacy_role_migration_promotes_only_first_owner():
     engine.dispose()
 
 
-def test_operator_cannot_add_material_plans(manager, order_payload):
+def test_operator_can_request_material_but_cannot_manage_stock(manager, order_payload):
     item_id = material(manager)
     manager.post('/register/',json={'username':'worker','password':'pw','full_name':'Operator'})
     manager.post('/login/',json={'username':'worker','password':'pw'})
     payload=deepcopy(order_payload)
     payload['parts'][0].update(warehouse_material_id=item_id,planned_quantity='10')
-    assert manager.post('/orders/',json=payload).status_code == 403
-    assert manager.get('/orders/').json() == []
+    assert manager.post('/orders/',json=payload).status_code == 201
+    saved=manager.get('/orders/').json()[0]
+    assert saved['parts'][0]['reserved_quantity']=='10.000000'
+    assert manager.get(BASE+'/materials').status_code == 403
     catalog=manager.get('/metadata/material-catalog').json()
-    assert set(catalog[0]) == {'id','name','unit'}
+    assert set(catalog[0]) == {'id','name','unit','available_quantity'}
 
 
 @pytest.mark.parametrize('fields',[
@@ -256,6 +260,8 @@ def test_operator_cannot_add_material_plans(manager, order_payload):
 def test_incomplete_plans_never_create_partial_orders(manager,order_payload,fields):
     material(manager)
     payload=deepcopy(order_payload)
+    for key in ('warehouse_material_id','planned_quantity','planned_for'):
+        payload['parts'][0].pop(key,None)
     payload['parts'][0].update(fields)
     assert manager.post('/orders/',json=payload).status_code == 422
     assert manager.get('/orders/').json() == []

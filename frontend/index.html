@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>WeldERP - Zarządzanie Zleceniami</title>
-    <link rel="stylesheet" href="/frontend/css/material-plan.css">
+    <link rel="stylesheet" href="/frontend/css/material-plan.css?v=rezerwacje-1">
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f3f5f9; padding: 20px; color: #1f2937; margin: 0; }
         .header-container { text-align: center; margin-bottom: 20px; }
@@ -67,7 +67,7 @@
 </div>
 
 <script src="/frontend/js/api.js?v=manager-planning-1"></script>
-<script src="/frontend/js/material-plan.js?v=magazyn-2"></script>
+<script src="/frontend/js/material-plan.js?v=rezerwacje-1"></script>
 <script>
     let availableOperators = [];
     let submittedOrder = null;
@@ -95,7 +95,7 @@
                     ${operatorOptionsHtml()}
                 </select>
             </div>
-            <input type="text" class="part-material" placeholder="Materiał (np. S235, aluminium, profil 40x40)" style="margin-top: 0;">
+            <input type="hidden" class="part-material">
             <div style="margin-bottom: 10px;">
                 <label style="font-size: 11px; color: #6b7280;">Załączniki PDF dla części:</label>
                 <input type="file" class="part-pdf-input" multiple accept=".pdf" style="display: none;" onchange="handleFileSelection(this)">
@@ -181,7 +181,7 @@
                     }
                 }
             }
-            alert('Zlecenie i załączniki zapisane');
+            alert('Zlecenie i załączniki zapisane.' + (submittedOrder.material_warnings?.length ? '\n\nBrak materiału. Zlecenie pozostaje w oczekujących:\n' + submittedOrder.material_warnings.join('\n') : '\nPotrzebny materiał został zarezerwowany.'));
             window.location.href = '/kanban.html';
         } catch (error) {
             const prefix = submittedOrder ? `Zlecenie ${submittedOrder.order_number} jest już zapisane. Popraw załączniki i ponów, aby dokończyć ich przesyłanie.\n` : '';

@@ -120,8 +120,8 @@ window.WarehousePlanning = (() => {
         byId('movementPartLabel').hidden = kind !== 'issue';
         byId('movementPlanHint').hidden = kind !== 'issue';
         byId('movementPart').innerHTML = '<option value="">Rozchód ogólny (bez zlecenia)</option>' +
-            demands.filter(item => item.material_id === materialId).map(item => `<option value="${item.part_id}">
-            ${escape(item.order_number)} / ${escape(item.part_name)} · pozostało ${escape(amount(item.remaining_quantity))}</option>`).join('');
+            demands.filter(item => item.material_id === materialId && Number(item.reserved_quantity) > 0).map(item => `<option value="${item.part_id}">
+            ${escape(item.order_number)} / ${escape(item.part_name)} · zarezerwowano ${escape(amount(item.reserved_quantity))}</option>`).join('');
     }
     return {refresh, prepareIssue};
 })();

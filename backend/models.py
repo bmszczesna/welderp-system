@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Date, DateTime, ForeignKey, Boolean, Float, Text, Numeric, CheckConstraint, UniqueConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, column_property
+from sqlalchemy import select, func
 from backend.database import Base
 import datetime
 from sqlalchemy import Enum
@@ -61,6 +62,25 @@ class Order(Base):
     parts = relationship("OrderPart", back_populates="owner", cascade="all, delete-orphan", order_by="(OrderPart.position, OrderPart.id)")
     status_events = relationship("OrderStatusEvent", back_populates="order", cascade="all, delete-orphan", order_by="OrderStatusEvent.id")
 
+    @property
+    def material_warnings(self):
+        if self.status in (OrderStatus.COMPLETED, OrderStatus.ARCHIVED):
+            return []
+        warnings = []
+        for part in self.parts:
+            if not part.warehouse_material_id or part.planned_quantity is None:
+                warnings.append(f'{part.part_name}: wybierz materiał z magazynu i podaj potrzebną ilość.')
+            elif part.shortage_quantity > 0:
+                warnings.append(f'{part.part_name}: brakuje {part.shortage_quantity.normalize():f} {part.planned_unit} '
+                                f'materiału {part.planned_material_name}. Uzupełnij magazyn.')
+            elif part.material_missing:
+                warnings.append(f'{part.part_name}: zgłoszono brak materiału.')
+        return warnings
+
+    @property
+    def materials_ready(self):
+        return not self.material_warnings
+
 
 class OrderPart(Base):
     __tablename__ = "order_parts"
@@ -75,6 +95,7 @@ class OrderPart(Base):
     warehouse_material_id = Column(Integer, ForeignKey("warehouse_materials.id"), nullable=True)
     planned_quantity = Column(Numeric(18, 6), nullable=True)
     planned_for = Column(Date, nullable=True)
+    reserved_quantity = Column(Numeric(18, 6), nullable=False, default=Decimal('0'), server_default='0')
     planned_material = relationship("WarehouseMaterial")
 
     @property
@@ -84,6 +105,16 @@ class OrderPart(Base):
     @property
     def planned_material_name(self):
         return self.planned_material.name if self.planned_material else None
+
+    @property
+    def remaining_quantity(self):
+        return max(Decimal('0'), (self.planned_quantity or Decimal('0')) - (self.issued_quantity or Decimal('0')))
+
+    @property
+    def shortage_quantity(self):
+        if self.owner.status in (OrderStatus.COMPLETED, OrderStatus.ARCHIVED):
+            return Decimal('0')
+        return max(Decimal('0'), self.remaining_quantity - (self.reserved_quantity or Decimal('0')))
     order_id = Column(Integer, ForeignKey("orders.id"))
     operator = Column(String, nullable=True)
 
@@ -158,7 +189,11 @@ class WarehouseMaterial(Base):
 
     @property
     def is_low_stock(self):
-        return self.quantity <= self.minimum_quantity
+        return self.available_quantity <= self.minimum_quantity
+
+    @property
+    def available_quantity(self):
+        return self.quantity - (self.reserved_quantity or Decimal('0'))
 
 
 class WarehouseMovement(Base):
@@ -195,3 +230,11 @@ class WarehouseDelivery(Base):
     status = Column(String(20), nullable=False, default="ordered")
     note = Column(String(500), nullable=False, default="")
     created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow)
+
+
+OrderPart.issued_quantity = column_property(select(func.coalesce(-func.sum(WarehouseMovement.quantity), 0))
+    .where(WarehouseMovement.order_part_id == OrderPart.id, WarehouseMovement.kind == 'issue')
+    .correlate_except(WarehouseMovement).scalar_subquery())
+WarehouseMaterial.reserved_quantity = column_property(select(func.coalesce(func.sum(OrderPart.reserved_quantity), 0))
+    .where(OrderPart.warehouse_material_id == WarehouseMaterial.id)
+    .correlate_except(OrderPart).scalar_subquery())

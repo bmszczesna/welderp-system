@@ -5,7 +5,7 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>WeldERP</title>
 	<link rel="stylesheet" href="/frontend/css/kanban.css">
-	<link rel="stylesheet" href="/frontend/css/material-plan.css">
+	<link rel="stylesheet" href="/frontend/css/material-plan.css?v=rezerwacje-1">
 </head>
 <body>
 	<main class="page">
@@ -166,7 +166,7 @@
 	</div>
 
 	<script src="/frontend/js/api.js?v=manager-planning-1"></script>
-	<script src="/frontend/js/material-plan.js?v=magazyn-2"></script>
+	<script src="/frontend/js/material-plan.js?v=rezerwacje-1"></script>
 <script>
 		async function checkAuth() {
 			const res = await fetch("/orders/");
@@ -270,7 +270,7 @@
 			btnDeleteOrder.style.display = order.status === 'IN_QUEUE' ? 'inline-block' : 'none';
 
 			const readOnly = order.status === 'COMPLETED' || order.status === 'ARCHIVED';
-			const canRecordProduction = order.status === 'IN_PROGRESS' && !(order.parts || []).some(part => part.material_missing);
+			const canRecordProduction = order.status === 'IN_PROGRESS' && order.materials_ready;
 			let productionHint = '';
 			if (order.status === 'QUALITY_CHECK') {
 				productionHint = 'Odznaczenie wykonanej operacji cofnie zlecenie do realizacji i wycofa zatwierdzenie jakości.';
@@ -279,7 +279,8 @@
 			} else if (readOnly) {
 				productionHint = 'Zlecenie jest zakończone. Rejestr produkcji jest dostępny tylko do odczytu.';
 			}
-			let partsHtml = productionHint ? `<p class="production-hint" style="font-size:13px; color:#4b5563;">${productionHint}</p>` : '';
+			let partsHtml = (order.material_warnings || []).map(text => `<p class="material-shortage">${escapeHtml(text)}</p>`).join('');
+            partsHtml += productionHint ? `<p class="production-hint" style="font-size:13px; color:#4b5563;">${productionHint}</p>` : '';
 			partsHtml += `<ol class="modal-parts-list" style="padding-left: 20px; list-style-type: decimal;">`;
 
 			if (order.parts && order.parts.length > 0) {
@@ -291,7 +292,7 @@
 					const materialButtonText = part.material_missing ? 'Materiał uzupełniony' : 'Brak materiału';
 					const materialButtonClass = part.material_missing ? 'material-ok-btn' : 'material-missing-btn';
 					const missingBadge = part.material_missing ? `<span class="material-missing-label">Brak materiału</span>` : '';
-					const canChangeMaterialStatus = order.status !== 'COMPLETED' && order.status !== 'ARCHIVED';
+					const canChangeMaterialStatus = order.status !== 'COMPLETED' && order.status !== 'ARCHIVED' && (!part.warehouse_material_id || part.material_missing);
 					const materialActionHtml = canChangeMaterialStatus
 						? `<button type="button" class="part-material-btn ${materialButtonClass}" onclick="togglePartMaterialMissing(${part.id}, ${!part.material_missing})">${materialButtonText}</button>`
 						: '';
@@ -439,6 +440,7 @@
 			`;
 
 			partEl.querySelector('.edit-part-operator').value = part.operator || "";
+            partEl.querySelector('.edit-part-material').parentElement.style.display = 'none';
             partEl.querySelector('.edit-part-material').parentElement.insertAdjacentElement('afterend', MaterialPlan.create(part));
 
 			partEl.querySelector('.remove-part-btn').addEventListener('click', () => {
@@ -573,7 +575,7 @@
             }
             closeModal();
             await loadOrders();
-            showMessage('Zlecenie i załączniki zapisane', 'success');
+            showMessage(result.material_warnings?.length ? 'Zlecenie zapisane. ' + result.material_warnings.join(' ') : 'Zlecenie zapisane. Materiał zarezerwowany.', result.material_warnings?.length ? 'error' : 'success');
         } catch (error) {
             showMessage((savedStructure ? 'Dane zlecenia zapisane. Ponów zapis pozostałych załączników: ' : '') + error.message, 'error');
         } finally {
@@ -598,7 +600,7 @@
 			card.draggable = true;
 			card.dataset.orderId = String(order.id);
 			card.dataset.status = order.status;
-			const hasMissingMaterial = order.parts && order.parts.some(part => part.material_missing);
+			const hasMissingMaterial = !order.materials_ready;
 			const needsCorrection = order.needs_correction && order.status !== 'COMPLETED' && order.status !== 'ARCHIVED';
 
 			if (order.is_approved && order.status !== 'COMPLETED' && order.status !== 'ARCHIVED') {
@@ -643,7 +645,7 @@
 			};
 
             const deadlineStr = order.date_deadline ? order.date_deadline.slice(0, 10) : "Brak terminu";
-			const missingMaterialHtml = hasMissingMaterial ? `<p class="card-alert">Brak materiału</p>` : '';
+			const missingMaterialHtml = hasMissingMaterial ? `<p class="card-alert">Brak materiału — uzupełnij magazyn</p>` : '';
 			const needsCorrectionHtml = needsCorrection ? `<p class="card-alert correction-alert">Do poprawy - priorytet</p>` : '';
 
 			let qualityActionsHtml = '';
@@ -754,27 +756,19 @@
 				return;
 			}
 
-			if (targetStatus !== 'IN_QUEUE' && current.parts && current.parts.some(part => part.material_missing)) {
-				showMessage("Najpierw odkliknij brak materiału przy części.", "error");
-				return;
-			}
-
-			const previousStatus = current.status;
-			current.status = targetStatus;
-			renderBoard();
-
 			const res = await fetch(`/orders/${orderId}/status?status=${targetStatus}`, {
 				method: "PUT"
 			});
 
 			if (!res.ok) {
-				current.status = previousStatus;
-				renderBoard();
-				showMessage("Nie udało się zmienić statusu", "error");
+				const problem = await res.json().catch(() => ({}));
+                await loadOrders();
+				showMessage(WeldERP.errorMessage(problem.detail || 'Nie udało się zmienić statusu'), "error");
 				return;
 			}
 
-			showMessage("Status zaktualizowany", "success");
+			await loadOrders();
+            showMessage("Status zaktualizowany", "success");
 		}
 
 		function setupDropZones() {

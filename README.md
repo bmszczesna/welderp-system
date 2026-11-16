@@ -70,21 +70,33 @@ docker compose -f docker-compose.preview.yml up -d
 
 Przycisk **Magazyn** na tablicy Kanban otwiera `/frontend/warehouse.html`.
 Konto operatora nie widzi tego przycisku, a API magazynu odrzuca dostęp bez roli kierownika.
-Każda pozycja ma nazwę, jednostkę, bieżący stan i próg ostrzeżenia.
+Każda pozycja pokazuje ilość na stanie, ilość zarezerwowaną dla zleceń, wolny zapas
+i minimum. Rezerwacja powstaje od razu przy zapisaniu zlecenia i nie zmniejsza stanu fizycznego.
 
 1. Dodaj materiał, np. `S235JR`, jednostkę `kg`, stan początkowy `100` i minimum `20`.
 2. Dostawę zapisz przyciskiem **Przyjmij**, a zużycie produkcyjne przyciskiem **Wydaj**.
 3. Przy wydaniu możesz wskazać część zlecenia: ten rozchód zmniejszy również jej pozostałe zapotrzebowanie.
 4. **Historia** pokazuje przyjęcia, rozchody, zlecenie i stan po każdym ruchu.
 
-Podczas dodawania lub edycji zlecenia kierownik może dla każdej części wybrać pozycję
-magazynową, planowaną ilość i opcjonalny dzień zużycia. Bez osobnej daty plan używa
-terminu realizacji zlecenia i podąża za jego zmianą. Zwykły opis materiału oraz zapis
-rzeczywistego zużycia na karcie części pozostają odrębnymi informacjami.
+Podczas dodawania lub edycji zlecenia wybierz przy każdej części materiał z magazynu
+i potrzebną ilość. Nie podaje się osobnej daty rezerwacji. Wybór jest dostępny również
+dla operatora tworzącego zlecenie; obsługa stanów magazynowych pozostaje dostępna kierownikowi.
+
+Zlecenie rezerwuje tylko wolny materiał. Przy zbyt małej ilości zapisuje się w oczekujących
+z ostrzeżeniem, ile brakuje. Nie można przesunąć go do realizacji ani kolejnych kolumn
+do czasu uzupełnienia zapasu. Blokadę sprawdza także serwer. Brak wyboru materiału lub
+potrzebnej ilości również blokuje dalszą pracę, w tym przy starszych zleceniach.
+
+Po przyjęciu materiału system automatycznie uzupełnia brakujące rezerwacje według kolejności
+utworzenia części. Istniejące rezerwacje są zachowane, więc edycja starszego zlecenia
+nie zabiera zapasu innym. Zmniejszenie potrzeb, usunięcie części lub zlecenia oraz zamknięcie
+zlecenia zwalniają rezerwację. Wydanie na część jednocześnie zmniejsza stan, jej rezerwację
+i pozostałe zapotrzebowanie. Rozchód ogólny może pobrać wyłącznie wolny materiał.
 
 Prognoza na 7, 14 lub 30 dni pokazuje stan na koniec jutra, pierwszy dzień wyczerpania
 zapasów, ilość do zamówienia i dzienny bilans. Uwzględnia bieżący stan, jeszcze
-niewydane planowane ilości aktywnych zleceń oraz zaplanowane dostawy. Zakończone
+niewydane potrzebne ilości aktywnych zleceń oraz zaplanowane dostawy. Zużycie jest
+prognozowane według terminu zlecenia; rezerwacja nie czeka na tę datę. Zakończone
 i archiwalne zlecenia nie tworzą zapotrzebowania. Zaległe potrzeby trafiają na dziś;
 spóźnione dostawy są sygnalizowane i nie zwiększają prognozowanego stanu.
 Ostrzeżenie wskazuje części bez kompletnego planu, których potrzeb prognoza nie obejmuje.
@@ -95,7 +107,7 @@ zdarzeń wewnątrz dnia. Plan dostawy jest wpisem w systemie; fizyczny stan zwi�
 dopiero po **Przyjmij dostawę**. Przyjęcie jest jednokrotne, a otrzymana dostawa przestaje
 być liczona jako przyszły przychód. Wysłanie zamówienia do dostawcy odbywa się poza aplikacją.
 
-Rozchód przekraczający dostępny stan jest odrzucany. Ilości przyjmują przecinek lub kropkę
+Rozchód przekraczający wolny stan lub rezerwację wskazanej części jest odrzucany. Ilości przyjmują przecinek lub kropkę
 i maksymalnie sześć miejsc po przecinku. Materiał z taką samą nazwą i jednostką może wystąpić
 tylko raz; jednostki są normalizowane, ale nie są przeliczane między sobą.
 

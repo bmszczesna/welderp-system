@@ -232,6 +232,10 @@ class PartResponse(ORMResponse):
     planned_for: Optional[date] = None
     planned_unit: Optional[str] = None
     planned_material_name: Optional[str] = None
+    reserved_quantity: Decimal = Decimal('0')
+    issued_quantity: Decimal = Decimal('0')
+    remaining_quantity: Decimal = Decimal('0')
+    shortage_quantity: Decimal = Decimal('0')
     material_quantity: Optional[float] = None
     material_unit: Optional[str] = None
     operator: Optional[str] = None
@@ -246,6 +250,8 @@ class OrderResponse(ORMResponse):
     status: OrderStatus
     is_approved: bool = False
     needs_correction: bool = False
+    materials_ready: bool = True
+    material_warnings: list[str] = Field(default_factory=list)
     date_received: Optional[datetime] = None
     date_deadline: Optional[datetime] = None
     status_changed_at: Optional[datetime] = None

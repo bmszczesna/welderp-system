@@ -2,9 +2,13 @@
 .material-plan[hidden] { display: none; }
 .material-plan legend { color: #1e40af; font-size: 13px; font-weight: 700; padding: 0 5px; }
 .material-plan p { margin: 5px 0 10px; font-size: 12px; line-height: 1.5; color: #475569; }
-.material-plan-grid { display: grid; grid-template-columns: 2fr 1fr 1.4fr; gap: 10px; }
+.material-plan-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 10px; }
 .material-plan-grid label { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 600; }
 .material-plan-grid input, .material-plan-grid select { width: 100%; padding: 9px; margin: 0; font: inherit; font-weight: 400; background: white; border: 1px solid #cbd5e1; border-radius: 7px; }
 .material-plan-summary { padding: 9px 12px; background: #eff6ff; border-radius: 7px; font-size: 12px; color: #1e40af; }
 [data-manager-only][hidden] { display: none !important; }
 @media(max-width: 700px) { .material-plan-grid { grid-template-columns: 1fr; } }
+[hidden] { display: none !important; }
+.material-shortage { color: #b45309; font-weight: 600; }
+.material-plan p.material-shortage { color: #b45309; }
+.material-availability { font-size: 13px; line-height: 1.5; }

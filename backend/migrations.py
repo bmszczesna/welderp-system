@@ -49,6 +49,7 @@ def initialize_database(engine):
         "order_parts": {"material": "VARCHAR", "material_missing": "BOOLEAN DEFAULT false",
                         "material_quantity": "DOUBLE PRECISION", "material_unit": "VARCHAR",
                         "warehouse_material_id": "INTEGER", "planned_quantity": "NUMERIC(18,6)", "planned_for": "DATE",
+                        "reserved_quantity": "NUMERIC(18,6) NOT NULL DEFAULT 0",
                         "position": "INTEGER NOT NULL DEFAULT 0"},
         "process_steps": {"completed_at": "TIMESTAMP", "completed_by": "VARCHAR",
                           "production_notes": "TEXT", "material_used": "VARCHAR",
@@ -73,3 +74,8 @@ def initialize_database(engine):
         # Run only when upgrading an old schema. A later cleared value stays cleared.
         if part_usage_added:
             migrate_part_material_usage(connection)
+    from sqlalchemy.orm import Session
+    from backend.reservations import synchronize
+    with Session(engine) as db:
+        synchronize(db)
+        db.commit()

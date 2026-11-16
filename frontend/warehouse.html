@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Magazyn - WeldERP</title>
     <link rel="stylesheet" href="/frontend/css/kanban.css">
-    <link rel="stylesheet" href="/frontend/css/warehouse.css?v=manager-planning-1">
+    <link rel="stylesheet" href="/frontend/css/warehouse.css?v=rezerwacje-1">
 </head>
 <body>
 <main class="page warehouse-page" id="warehousePage" hidden>
@@ -56,8 +56,8 @@
         </div>
         <div class="warehouse-table-wrap">
             <table class="warehouse-table">
-                <thead><tr><th>Materiał</th><th>Stan</th><th>Minimum</th><th>Status</th><th>Działania</th></tr></thead>
-                <tbody id="warehouseRows"><tr><td colspan="5" class="warehouse-empty">Ładowanie materiałów…</td></tr></tbody>
+                <thead><tr><th>Materiał</th><th>Na stanie</th><th>Zarezerwowane</th><th>Wolne</th><th>Minimum</th><th>Status</th><th>Działania</th></tr></thead>
+                <tbody id="warehouseRows"><tr><td colspan="7" class="warehouse-empty">Ładowanie materiałów…</td></tr></tbody>
             </table>
         </div>
     </section>
@@ -138,7 +138,7 @@
     <div class="warehouse-dialog-actions"><button class="btn" type="button" data-close>Zamknij</button></div>
 </dialog>
 <script src="/frontend/js/api.js?v=manager-planning-1"></script>
-<script src="/frontend/js/warehouse-planning.js"></script>
-<script src="/frontend/js/warehouse.js?v=magazyn-2"></script>
+<script src="/frontend/js/warehouse-planning.js?v=rezerwacje-1"></script>
+<script src="/frontend/js/warehouse.js?v=rezerwacje-1"></script>
 </body>
 </html>

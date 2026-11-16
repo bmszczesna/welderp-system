@@ -39,16 +39,18 @@
         const search = byId('materialSearch').value.trim().toLocaleLowerCase('pl-PL');
         const visible = materials.filter(item => item.name.toLocaleLowerCase('pl-PL').includes(search));
         if (!visible.length) {
-            rows.innerHTML = `<tr><td colspan="5" class="warehouse-empty">${materials.length ? 'Brak materiałów pasujących do wyszukiwania.' : 'Magazyn jest pusty. Dodaj pierwszy materiał i jego stan początkowy.'}</td></tr>`;
+            rows.innerHTML = `<tr><td colspan="7" class="warehouse-empty">${materials.length ? 'Brak materiałów pasujących do wyszukiwania.' : 'Magazyn jest pusty. Dodaj pierwszy materiał i jego stan początkowy.'}</td></tr>`;
             return;
         }
         rows.innerHTML = visible.map(item => {
             const empty = Number(item.quantity) === 0;
             const state = empty ? 'empty' : item.is_low_stock ? 'low' : 'ok';
-            const label = empty ? 'Brak na stanie' : item.is_low_stock ? 'Niski stan' : 'Dostępny';
+            const label = empty ? 'Brak na stanie' : Number(item.available_quantity) === 0 ? 'Zarezerwowany' : item.is_low_stock ? 'Niski wolny stan' : 'Dostępny';
             return `<tr>
                 <td class="warehouse-name">${escape(item.name)}</td>
                 <td><strong>${escape(quantity(item.quantity, item.unit))}</strong></td>
+                <td>${escape(quantity(item.reserved_quantity, item.unit))}</td>
+                <td><strong>${escape(quantity(item.available_quantity, item.unit))}</strong></td>
                 <td>${escape(quantity(item.minimum_quantity, item.unit))}</td>
                 <td><span class="warehouse-status ${state}">${label}</span></td>
                 <td><div class="warehouse-row-actions">
@@ -74,7 +76,7 @@
         } catch (error) {
             if (revision !== materialLoadRevision) return false;
             showMessage(`Nie udało się odświeżyć magazynu: ${error.message}`);
-            if (!materials.length) rows.innerHTML = '<tr><td colspan="5" class="warehouse-empty">Nie można pobrać stanów. Spróbuj ponownie przyciskiem „Odśwież”.</td></tr>';
+            if (!materials.length) rows.innerHTML = '<tr><td colspan="7" class="warehouse-empty">Nie można pobrać stanów. Spróbuj ponownie przyciskiem „Odśwież”.</td></tr>';
             return false;
         } finally { if (revision === materialLoadRevision) refresh.disabled = false; }
     }
@@ -172,7 +174,7 @@
             byId('movementHeading').textContent = action === 'receipt' ? 'Przyjęcie materiału' : 'Wydanie materiału';
             byId('saveMovement').textContent = action === 'receipt' ? 'Zapisz przyjęcie' : 'Zapisz rozchód';
             byId('movementMaterial').textContent = `${item.name} · ${item.unit}`;
-            byId('movementAvailable').textContent = `Dostępne: ${quantity(item.quantity, item.unit)}`;
+            byId('movementAvailable').textContent = `Na stanie: ${quantity(item.quantity, item.unit)} · wolne bez rezerwacji: ${quantity(item.available_quantity, item.unit)}.` + (action === 'issue' ? ' Przy wydaniu z rezerwacji wybierz zlecenie.' : '');
             byId('movementDialog').showModal();
         }
     });

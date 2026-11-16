@@ -65,5 +65,6 @@ def current_user(user=Depends(auth.require_user)):
 
 @router.get("/metadata/material-catalog", tags=["Zlecenia"])
 def material_catalog(db: Session = Depends(database.get_db), user=Depends(auth.require_user)):
-    return [{"id": material.id, "name": material.name, "unit": material.unit}
+    return [{"id": material.id, "name": material.name, "unit": material.unit,
+             "available_quantity": material.available_quantity}
             for material in db.scalars(select(models.WarehouseMaterial).order_by(models.WarehouseMaterial.name_key))]

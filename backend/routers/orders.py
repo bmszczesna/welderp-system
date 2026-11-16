@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from backend import auth, database, file_storage, models, order_service as service, settings, warehouse
+from backend import auth, database, file_storage, models, order_service as service, settings, warehouse, reservations
 from backend.models import OrderStatus
 from backend.schemas import MATERIAL_UNITS, OrderCreate, OrderResponse, OrderUpdate, StatusEventResponse
 
@@ -17,7 +17,8 @@ def material_units():
 def create_order(payload: OrderCreate, db: Session = Depends(database.get_db), user=Depends(auth.optional_user)):
     order = service.create_order(db, payload, user)
     return {"message": "Zlecenie utworzone", "order_id": order.id,
-            "order_number": order.order_number, "parts": service.created_parts(order, payload)}
+            "order_number": order.order_number, "parts": service.created_parts(order, payload),
+            "materials_ready": order.materials_ready, "material_warnings": order.material_warnings}
 
 
 @router.get("/orders/", response_model=list[OrderResponse], tags=["Zlecenia"])
@@ -37,15 +38,18 @@ def order_history(order_id: int, db: Session = Depends(database.get_db)):
 
 @router.put("/orders/{order_id}", tags=["Zlecenia"])
 def update_order(order_id: int, payload: OrderUpdate, db: Session = Depends(database.get_db), user=Depends(auth.optional_user)):
+    reservations.lock_inventory(db)
     order = service.get_order(db, order_id)
     paths = service.update_order(db, order, payload, user)
     file_storage.remove_files(paths)
     return {"message": "Zlecenie zaktualizowane", "order_id": order.id,
-            "parts": service.created_parts(order, payload)}
+            "parts": service.created_parts(order, payload), "materials_ready": order.materials_ready,
+            "material_warnings": order.material_warnings}
 
 
 @router.put("/orders/{order_id}/status", tags=["Zlecenia"])
 def update_status(order_id: int, status: str, db: Session = Depends(database.get_db)):
+    reservations.lock_inventory(db)
     order = service.get_order(db, order_id)
     try:
         target = OrderStatus(status)
@@ -58,7 +62,7 @@ def update_status(order_id: int, status: str, db: Session = Depends(database.get
         else:
             service.editable(order)
         if target != OrderStatus.IN_QUEUE:
-            service.ensure_material_available(order)
+            service.ensure_material_available(db, order)
         if target == OrderStatus.COMPLETED and not order.is_approved:
             raise HTTPException(status_code=400, detail="Wymagane jest zatwierdzenie jakości przed zakończeniem")
         service.change_status(db, order, target, "Zmiana statusu na tablicy Kanban")
@@ -70,6 +74,7 @@ def update_status(order_id: int, status: str, db: Session = Depends(database.get
 
 @router.delete("/orders/{order_id}", tags=["Zlecenia"])
 def delete_order(order_id: int, db: Session = Depends(database.get_db)):
+    reservations.lock_inventory(db)
     order = service.get_order(db, order_id)
     if order.status != OrderStatus.IN_QUEUE:
         raise HTTPException(status_code=400, detail="Można usunąć tylko zlecenie oczekujące")
@@ -93,10 +98,11 @@ def assign_operator(order_id: int, operator_name: str, db: Session = Depends(dat
 
 @router.put("/orders/{order_id}/approve", tags=["Zlecenia"])
 def approve_order(order_id: int, db: Session = Depends(database.get_db)):
+    reservations.lock_inventory(db)
     order = service.get_order(db, order_id)
     if order.status != OrderStatus.QUALITY_CHECK:
         raise HTTPException(status_code=400, detail="Zlecenie musi być w kontroli jakości")
-    service.ensure_material_available(order)
+    service.ensure_material_available(db, order)
     order.is_approved, order.needs_correction = True, False
     service.commit(db)
     return {"message": "Zlecenie zatwierdzone"}

@@ -277,6 +277,7 @@ def seed_warehouse_demo(engine, reference_date=None):
         if not db.scalar(select(models.WarehouseDelivery).where(models.WarehouseDelivery.note == note)):
             db.add(models.WarehouseDelivery(material_id=materials[('S355','kg')].id, quantity=Decimal('10'),
                 expected_on=reference+timedelta(days=2), status='ordered', note=note))
+        warehouse.reservations.synchronize(db)
         db.commit()
     return {'material_positions': len(materials), 'new_part_plans': planned}
 

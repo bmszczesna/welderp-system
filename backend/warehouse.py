@@ -10,7 +10,7 @@ from pydantic import Field, field_validator
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from backend import auth, models
+from backend import auth, models, reservations
 from backend.schemas import InputModel, ORMResponse, normalize_unit
 
 MAX_QUANTITY = Decimal("999999999.999999")
@@ -66,6 +66,8 @@ class MaterialResponse(ORMResponse):
     quantity: Decimal
     minimum_quantity: Decimal
     is_low_stock: bool
+    reserved_quantity: Decimal
+    available_quantity: Decimal
 
 
 class MovementResponse(ORMResponse):
@@ -125,7 +127,8 @@ def existing_movement(db, material_id, payload):
 
 
 def record_movement(db, material_id, payload, commit=True):
-    get_material(db, material_id)
+    reservations.synchronize(db)
+    material = get_material(db, material_id)
     previous = existing_movement(db, material_id, payload)
     if previous is not None:
         return previous
@@ -145,6 +148,11 @@ def record_movement(db, material_id, payload, commit=True):
         remaining = part.planned_quantity - issued_quantity(db, part.id)
         if payload.quantity > remaining:
             raise HTTPException(status_code=409, detail="Rozchód przekracza pozostałe zapotrzebowanie części")
+        if payload.quantity > part.reserved_quantity:
+            raise HTTPException(status_code=409, detail='Rozchód przekracza rezerwację tej części. Uzupełnij magazyn.')
+        part.reserved_quantity -= payload.quantity
+    elif payload.kind == 'issue' and payload.quantity > material.available_quantity:
+        raise HTTPException(status_code=409, detail='Materiał jest zarezerwowany dla zleceń. Wybierz właściwe zlecenie lub wydaj tylko wolną ilość.')
     delta = payload.quantity if payload.kind == "receipt" else -payload.quantity
     # The stock check and update form one SQL operation, including concurrent issues.
     statement = update(models.WarehouseMaterial).where(models.WarehouseMaterial.id == material_id)
@@ -169,6 +177,7 @@ def record_movement(db, material_id, payload, commit=True):
                                             order_number=part.owner.order_number if part else "",
                                             part_name=part.part_name if part else "")
         db.add(movement)
+        reservations.synchronize(db)
         if commit:
             db.commit()
             db.refresh(movement)
@@ -208,7 +217,7 @@ def apply_part_plan(db, part, data, user):
     changed = any(getattr(part, field) != getattr(data, field) for field in fields)
     if not changed:
         return
-    auth.manager(user)
+    auth.require_user(user)
     material_id = data.warehouse_material_id
     planned = data.planned_quantity
     if material_id is not None:
@@ -216,6 +225,8 @@ def apply_part_plan(db, part, data, user):
     issued = issued_quantity(db, part.id)
     if issued and (material_id != part.warehouse_material_id or planned is None or planned < issued):
         raise HTTPException(status_code=409, detail="Plan nie może usuwać ani zmieniać materiału już wydanego na tę część")
+    if material_id != part.warehouse_material_id:
+        part.reserved_quantity = Decimal('0')
     for field in PLAN_FIELDS:
         setattr(part, field, getattr(data, field))
     if part.id:

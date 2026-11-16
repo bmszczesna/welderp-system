@@ -5,7 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
-from backend import models, warehouse
+from backend import models, warehouse, reservations
 from backend.models import OrderStatus
 
 
@@ -26,6 +26,7 @@ def get_order(db, order_id):
 
 def commit(db):
     try:
+        reservations.synchronize(db)
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -60,7 +61,8 @@ def has_missing_material(order):
     return any(part.material_missing for part in order.parts)
 
 
-def ensure_material_available(order):
+def ensure_material_available(db, order):
+    reservations.ensure_order_ready(db, order)
     if has_missing_material(order):
         raise HTTPException(status_code=400, detail="Najpierw uzupełnij brakujący materiał przy wszystkich częściach")
 
@@ -97,6 +99,7 @@ def validate_step_material(part, step):
 
 
 def create_order(db, payload, user=None):
+    reservations.lock_inventory(db)
     duplicate_number(db, payload.order_number)
     order = models.Order(order_number=payload.order_number, client_name=payload.client_name,
                          date_received=payload.date_received, date_deadline=payload.date_deadline,
@@ -121,6 +124,7 @@ def create_order(db, payload, user=None):
 
 
 def update_order(db, order, payload, user=None):
+    reservations.lock_inventory(db)
     editable(order)
     duplicate_number(db, payload.order_number, exclude=order.id)
     if order.date_received and payload.date_deadline.date() < order.date_received.date():
@@ -169,7 +173,8 @@ def update_order(db, order, payload, user=None):
             warehouse.detach_part_history(db, old_part.id)
             removed_paths.extend(pdf.file_path for pdf in old_part.pdfs)
     order.parts = updated_parts
-    if has_missing_material(order):
+    reservations.synchronize(db)
+    if not order.materials_ready:
         change_status(db, order, OrderStatus.IN_QUEUE, "Edycja zlecenia z brakującym materiałem")
     commit(db)
     return removed_paths

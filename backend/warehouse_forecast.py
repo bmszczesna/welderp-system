@@ -62,6 +62,7 @@ class DemandResponse(BaseModel):
     part_name: str
     required_quantity: Decimal
     remaining_quantity: Decimal
+    reserved_quantity: Decimal
     needed_on: date
 
 
@@ -87,7 +88,8 @@ def active_demands(db):
         if remaining:
             demands.append({"part_id": part.id, "material_id": part.warehouse_material_id,
                 "order_number": order.order_number, "part_name": part.part_name,
-                "required_quantity": part.planned_quantity, "remaining_quantity": remaining, "needed_on": due})
+                "required_quantity": part.planned_quantity, "remaining_quantity": remaining,
+                "reserved_quantity": part.reserved_quantity, "needed_on": due})
     return demands, unplanned
 
 

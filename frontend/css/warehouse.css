@@ -63,3 +63,4 @@
     .warehouse-summary span { min-height: 30px; }
     .warehouse-form-grid { grid-template-columns: 1fr; gap: 0; }
 }
+[hidden] { display: none !important; }

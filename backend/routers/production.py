@@ -20,7 +20,7 @@ def get_step(db, step_id):
 def get_active_step(db, step_id):
     step = get_step(db, step_id)
     order = step.owner_part.owner
-    service.ensure_material_available(order)
+    service.ensure_material_available(db, order)
     if order.status != OrderStatus.IN_PROGRESS:
         raise HTTPException(status_code=400, detail="Wykonanie operacji zapisuje się podczas realizacji zlecenia")
     return step
@@ -30,7 +30,7 @@ def set_completion(db, step, completed):
     order = step.owner_part.owner
     service.editable(order)
     if completed:
-        service.ensure_material_available(order)
+        service.ensure_material_available(db, order)
         if order.status != OrderStatus.IN_PROGRESS:
             raise HTTPException(status_code=400, detail="Wykonanie operacji zapisuje się podczas realizacji zlecenia")
     if step.is_completed == completed:
@@ -64,7 +64,7 @@ def part_material_usage(part_id: int, usage: PartMaterialUsage, db: Session = De
         raise HTTPException(status_code=404, detail="Nie znaleziono części")
     order = part.owner
     service.editable(order)
-    service.ensure_material_available(order)
+    service.ensure_material_available(db, order)
     if order.status != OrderStatus.IN_PROGRESS:
         raise HTTPException(status_code=400, detail="Zużycie materiału zapisuje się podczas realizacji zlecenia")
     if usage.material_quantity is not None and not part.material:

@@ -48,6 +48,7 @@ def initialize_database(engine):
                    "completed_at": "TIMESTAMP"},
         "order_parts": {"material": "VARCHAR", "material_missing": "BOOLEAN DEFAULT false",
                         "material_quantity": "DOUBLE PRECISION", "material_unit": "VARCHAR",
+                        "material_usage_version": "INTEGER NOT NULL DEFAULT 0",
                         "warehouse_material_id": "INTEGER", "planned_quantity": "NUMERIC(18,6)", "planned_for": "DATE",
                         "reserved_quantity": "NUMERIC(18,6) NOT NULL DEFAULT 0",
                         "position": "INTEGER NOT NULL DEFAULT 0"},

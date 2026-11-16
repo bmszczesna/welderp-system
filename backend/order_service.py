@@ -5,8 +5,9 @@ from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
-from backend import models, warehouse, reservations
+from backend import auth, material_usage, models, warehouse, reservations
 from backend.models import OrderStatus
+from backend.schemas import PartMaterialUsage
 
 
 def order_query(db):
@@ -146,6 +147,7 @@ def update_order(db, order, payload, user=None):
     order.is_approved = False
     removed_paths = []
     updated_parts = []
+    usage_updates = []
     for position, data in enumerate(payload.parts):
         part = existing_parts.get(data.id)
         if part is None:
@@ -153,9 +155,10 @@ def update_order(db, order, payload, user=None):
         part.part_name, part.material, part.operator, part.position = (
             data.part_name, data.material, data.operator, position)
         warehouse.apply_part_plan(db, part, data, user)
-        for field in ("material_quantity", "material_unit"):
-            if field in data.model_fields_set:
-                setattr(part, field, getattr(data, field))
+        if {"material_quantity", "material_unit"} & data.model_fields_set:
+            auth.require_user(user)
+            usage_updates.append((part, PartMaterialUsage(
+                material_quantity=data.material_quantity, material_unit=data.material_unit)))
         if part.material_quantity is not None and not part.material:
             raise HTTPException(status_code=422, detail="Podaj materiał części z zapisaną ilością")
         existing_steps = {step.id: step for step in part.steps}
@@ -174,6 +177,8 @@ def update_order(db, order, payload, user=None):
             removed_paths.extend(pdf.file_path for pdf in old_part.pdfs)
     order.parts = updated_parts
     reservations.synchronize(db)
+    for part, usage in usage_updates:
+        material_usage.reconcile(db, part.id, usage)
     if not order.materials_ready:
         change_status(db, order, OrderStatus.IN_QUEUE, "Edycja zlecenia z brakującym materiałem")
     commit(db)

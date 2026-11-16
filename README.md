@@ -74,8 +74,8 @@ Każda pozycja pokazuje ilość na stanie, ilość zarezerwowaną dla zleceń, w
 i minimum. Rezerwacja powstaje od razu przy zapisaniu zlecenia i nie zmniejsza stanu fizycznego.
 
 1. Dodaj materiał, np. `S235JR`, jednostkę `kg`, stan początkowy `100` i minimum `20`.
-2. Dostawę zapisz przyciskiem **Przyjmij**, a zużycie produkcyjne przyciskiem **Wydaj**.
-3. Przy wydaniu możesz wskazać część zlecenia: ten rozchód zmniejszy również jej pozostałe zapotrzebowanie.
+2. Dostawę zapisz przyciskiem **Przyjmij**. W karcie części podczas realizacji wpisz łączną zużytą ilość i kliknij **Zapisz zużycie** — magazyn rozliczy się automatycznie.
+3. Kierownik nadal może użyć **Wydaj** w magazynie. Wydanie przypisane do części aktualizuje także jej zużycie, więc nie wpisuje się go drugi raz.
 4. **Historia** pokazuje przyjęcia, rozchody, zlecenie i stan po każdym ruchu.
 
 Podczas dodawania lub edycji zlecenia wybierz przy każdej części materiał z magazynu
@@ -117,9 +117,23 @@ Rozchód przekraczający wolny stan lub rezerwację wskazanej części jest odrz
 i maksymalnie sześć miejsc po przecinku. Materiał z taką samą nazwą i jednostką może wystąpić
 tylko raz; jednostki są normalizowane, ale nie są przeliczane między sobą.
 
-Ruchy pozostają ręczne: samo wpisanie zużycia w karcie części nie odejmuje materiału
-z magazynu. Rozchód należy zapisać w widoku magazynu. Ponowienie tego samego zgłoszenia
-przyjęcia lub rozchodu z tym samym `request_id` nie tworzy drugiego ruchu.
+**Zapisz zużycie** rozlicza łączną ilość, a nie kolejną porcję: zapis 2,4 kg odejmuje
+2,4 kg ze stanu i rezerwacji. Ponowny zapis 2,4 kg niczego drugi raz nie odejmuje.
+Zmiana na 3 kg pobiera kolejne 0,6 kg; zmiana na 2 kg zwraca 1 kg do magazynu i przywraca
+potrzebną rezerwację tej części. Wpisanie 0 wycofuje całe zużycie. Historia zachowuje
+wydania i zwroty z opisem korekty. Zapis obejmuje stan, rezerwację i zużycie w jednej transakcji.
+Ilość ponad plan można zużyć tylko z wolnego zapasu; rezerwacje innych zleceń są chronione.
+Jednostka zużycia musi odpowiadać jednostce wybranego materiału. Prognoza liczy pozostałe
+potrzeby po uwzględnieniu zarówno wydań, jak i zwrotów.
+
+Stare zapisy produkcyjne nie zmniejszają automatycznie magazynu podczas aktualizacji
+aplikacji. Jeśli nie mają powiązanego wydania, karta pokazuje informację i pozwala
+je rozliczyć świadomym zapisem podczas realizacji. Istniejące wydania przypisane do części
+są uwzględniane, więc ten sam materiał nie zostaje pobrany dwukrotnie.
+Zapis zużycia wymaga zalogowania (także operator może go wykonać). Pole `expected_version`
+w API chroni formularz przed nadpisaniem nowszego zużycia z drugiego okna.
+Ponowienie tego samego zgłoszenia ręcznego przyjęcia lub rozchodu z tym samym `request_id`
+nie tworzy drugiego ruchu.
 Nowe tabele powstają automatycznie podczas startu aplikacji, z pustymi stanami.
 
 API magazynu: `GET/POST /api/warehouse/materials`,
@@ -129,8 +143,8 @@ API magazynu: `GET/POST /api/warehouse/materials`,
 `POST /api/warehouse/deliveries/{id}/receive` i `/cancel`.
 
 Prognoza na konkretny dzień: `GET /api/warehouse/forecast?target_date=YYYY-MM-DD`.
-Starszy parametr `days` pozostaje obsługiwany. Widok części rozróżnia rezerwację,
-wydania zapisane w magazynie i zużycie zapisane w produkcji. Zamknięte zlecenia
+Starszy parametr `days` pozostaje obsługiwany. Widok części pokazuje potrzebną ilość,
+pozostałą rezerwację i zużycie odjęte z magazynu. Zamknięte zlecenia
 nie pokazują wezwania do uzupełniania powiązania z magazynem.
 
 ## Dane bazy

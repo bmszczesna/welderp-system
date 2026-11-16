@@ -92,6 +92,7 @@ class OrderPart(Base):
     material_missing = Column(Boolean, default=False)
     material_quantity = Column(Float, nullable=True)
     material_unit = Column(String, nullable=True)
+    material_usage_version = Column(Integer, nullable=False, default=0, server_default='0')
     warehouse_material_id = Column(Integer, ForeignKey("warehouse_materials.id"), nullable=True)
     planned_quantity = Column(Numeric(18, 6), nullable=True)
     planned_for = Column(Date, nullable=True)
@@ -233,7 +234,7 @@ class WarehouseDelivery(Base):
 
 
 OrderPart.issued_quantity = column_property(select(func.coalesce(-func.sum(WarehouseMovement.quantity), 0))
-    .where(WarehouseMovement.order_part_id == OrderPart.id, WarehouseMovement.kind == 'issue')
+    .where(WarehouseMovement.order_part_id == OrderPart.id, WarehouseMovement.kind.in_(['issue', 'receipt']))
     .correlate_except(WarehouseMovement).scalar_subquery())
 WarehouseMaterial.reserved_quantity = column_property(select(func.coalesce(func.sum(OrderPart.reserved_quantity), 0))
     .where(OrderPart.warehouse_material_id == WarehouseMaterial.id)

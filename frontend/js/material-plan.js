@@ -53,14 +53,14 @@ window.MaterialPlan = (() => {
         const closed = status === 'COMPLETED' || status === 'ARCHIVED';
         if (!part.warehouse_material_id) return closed ? '' : '<p class="material-plan-summary material-shortage">Uzupełnij materiał i potrzebną ilość w edycji zlecenia. Bez tych danych nie można rozpocząć realizacji.</p>';
         if (closed) return `<div class="material-plan-summary material-history"><strong>Historia magazynu:</strong> ${escape(part.planned_material_name)} ·
-            zapisane wydania: ${escape(amount(part.issued_quantity, part.planned_unit))}.
+            wydano po korektach: ${escape(amount(part.issued_quantity, part.planned_unit))}.
             Zlecenie jest zamknięte, rezerwacja została zwolniona.</div>`;
         return `<div class="material-plan-summary ${Number(part.shortage_quantity) > 0 ? 'material-shortage' : ''}"><strong>Magazyn · ${escape(part.planned_material_name)}</strong><br>
             Potrzeba: ${escape(amount(part.planned_quantity, part.planned_unit))} ·
             Zarezerwowane teraz: ${escape(amount(part.reserved_quantity, part.planned_unit))}<br>
-            Wydania zapisane w magazynie: ${escape(amount(part.issued_quantity, part.planned_unit))}
+            Zużyte i odjęte z magazynu: ${escape(amount(part.issued_quantity, part.planned_unit))}
             ${Number(part.shortage_quantity) > 0 ? `<br><strong>Brakuje ${escape(amount(part.shortage_quantity, part.planned_unit))}. Uzupełnij magazyn, aby kontynuować.</strong>` : ''}
-            ${Number(part.material_quantity) > 0 && Number(part.issued_quantity) === 0 ? '<p class="material-stock-note">Zużycie w produkcji jest zapisane, ale w historii magazynu nie ma jeszcze wydania na tę część.</p>' : ''}</div>`;
+            ${part.material_quantity != null && (Number(part.material_quantity) !== Number(part.issued_quantity) || part.material_unit !== part.planned_unit) ? '<p class="material-stock-note">To wcześniejszy zapis zużycia, jeszcze nierozliczony z magazynem. Sprawdź ilość i jednostkę. Przycisk „Zapisz zużycie” rozliczy podaną ilość.</p>' : ''}</div>`;
     }
     function updateAvailability(current) {
         const fields = [...document.querySelectorAll('.material-plan')].filter(item => item.getClientRects().length);

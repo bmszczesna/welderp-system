@@ -177,6 +177,11 @@ def record_movement(db, material_id, payload, commit=True):
                                             order_number=part.owner.order_number if part else "",
                                             part_name=part.part_name if part else "")
         db.add(movement)
+        if part is not None:
+            # A manual issue is the same material usage, not an additional report to enter.
+            from backend.material_usage import set_report
+            db.flush()
+            set_report(part, issued_quantity(db, part.id), material.unit, force=True)
         reservations.synchronize(db)
         if commit:
             db.commit()
@@ -203,7 +208,8 @@ def issued_quantity(db, part_id):
     if part_id is None:
         return Decimal("0")
     return -db.scalar(select(func.coalesce(func.sum(models.WarehouseMovement.quantity), 0)).where(
-        models.WarehouseMovement.order_part_id == part_id, models.WarehouseMovement.kind == "issue"))
+        models.WarehouseMovement.order_part_id == part_id,
+        models.WarehouseMovement.kind.in_(["issue", "receipt"])))
 
 
 def apply_part_plan(db, part, data, user):

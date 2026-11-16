@@ -155,13 +155,15 @@ def test_failed_commit_rolls_back_stock_and_movement(client, monkeypatch):
     assert Decimal(stock(client, item)['quantity']) == 10 and history(client, item) == before
 
 
-def test_production_usage_is_separate_from_manual_stock(client, order_payload):
+def test_production_usage_only_debits_the_selected_material(client, order_payload):
     item = material(client)
     order_id = client.post('/orders/', json=order_payload).json()['order_id']
     order = client.get(f'/orders/{order_id}').json()
     client.put(f'/orders/{order_id}/status?status=IN_PROGRESS')
     assert client.put(f"/parts/{order['parts'][0]['id']}/material-usage", json={
         'material_quantity': 2, 'material_unit': 'kg'}).status_code == 200
+    selected = {'id': order['parts'][0]['warehouse_material_id']}
+    assert Decimal(stock(client, selected)['quantity']) == 998
     assert Decimal(stock(client, item)['quantity']) == 10
     assert move(client, item, 'issue', 2, note=order['order_number']).status_code == 201
     assert Decimal(stock(client, item)['quantity']) == 8

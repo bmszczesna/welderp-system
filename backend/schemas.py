@@ -9,6 +9,8 @@ from backend.models import OrderStatus
 
 Name = Annotated[str, Field(min_length=1, max_length=255)]
 Identifier = Annotated[int, Field(gt=0)]
+UsageQuantity = Annotated[Decimal, Field(ge=0, le=Decimal('999999999.999999'),
+                                          max_digits=15, decimal_places=6)]
 
 # Units are normalized, not converted: 1000 g remains 1000 g, not 1 kg.
 UNIT_ALIASES = {
@@ -83,7 +85,8 @@ class MaterialRecord(MaterialAmount):
 
 
 class PartMaterialUsage(MaterialAmount):
-    pass
+    material_quantity: Optional[UsageQuantity] = None
+    expected_version: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
 
 
 class StepCreate(MaterialRecord):
@@ -148,6 +151,7 @@ class PartCreate(MaterialAmount):
 
 class PartUpdate(PartCreate):
     id: Optional[Identifier] = None
+    material_quantity: Optional[UsageQuantity] = None
     steps: list[StepUpdate] = Field(min_length=1)
 
 
@@ -238,6 +242,7 @@ class PartResponse(ORMResponse):
     shortage_quantity: Decimal = Decimal('0')
     material_quantity: Optional[float] = None
     material_unit: Optional[str] = None
+    material_usage_version: int = 0
     operator: Optional[str] = None
     steps: list[StepResponse] = Field(default_factory=list)
     pdfs: list[PDFResponse] = Field(default_factory=list)

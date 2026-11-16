@@ -79,7 +79,7 @@ def active_demands(db):
     issued = dict(db.execute(select(models.WarehouseMovement.order_part_id,
         (-func.sum(models.WarehouseMovement.quantity)).label('issued_quantity')).where(
             models.WarehouseMovement.order_part_id.is_not(None),
-            models.WarehouseMovement.kind == "issue").group_by(models.WarehouseMovement.order_part_id)).all())
+            models.WarehouseMovement.kind.in_(["issue", "receipt"])).group_by(models.WarehouseMovement.order_part_id)).all())
     demands, unplanned = [], 0
     for part, order in rows:
         due = part.planned_for or (order.date_deadline.date() if order.date_deadline else None)

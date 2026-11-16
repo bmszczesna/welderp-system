@@ -166,7 +166,7 @@
 	</div>
 
 	<script src="/frontend/js/api.js?v=manager-planning-1"></script>
-	<script src="/frontend/js/material-plan.js?v=komunikaty-1"></script>
+	<script src="/frontend/js/material-plan.js?v=zuzycie-2"></script>
 <script>
 		async function checkAuth() {
 			const res = await fetch("/orders/");
@@ -309,19 +309,19 @@
 							</div>
 
                             ${MaterialPlan.describe(part, order.status)}
-                            <div class="part-material-usage" data-part-id="${part.id}">
-                                <div class="production-record-head"><strong>Zużycie zapisane w produkcji</strong></div>
+                            <div class="part-material-usage" data-part-id="${part.id}" data-usage-version="${part.material_usage_version}">
+                                <div class="production-record-head"><strong>Zużycie materiału</strong></div>
                                 <div class="production-material-info">Materiał: <strong>${escapeHtml(part.material || 'Brak wpisanego materiału')}</strong></div>
-                                <p class="production-hint">${readOnly ? 'To zapis produkcyjny. Historia wydań z magazynu jest prowadzona osobno.' : 'Ten zapis nie zmienia stanu ani rezerwacji w magazynie. Pobranie materiału zapisz w magazynie przyciskiem „Wydaj”.'}</p>
+                                <p class="production-hint">${readOnly ? 'Zapisane zużycie tej części.' : 'Wpisz łączną zużytą ilość. Zapis automatycznie odejmie materiał z magazynu i zwolni wykorzystaną rezerwację. Poprawienie ilości rozliczy tylko różnicę.'}</p>
                                 <div class="production-grid">
                                     <label>Zużyta ilość
                                         <input type="text" inputmode="decimal" class="part-material-quantity" value="${escapeHtml(part.material_quantity ?? '')}" placeholder="np. 1,25" ${canRecordProduction ? '' : 'disabled'}>
                                     </label>
                                     <label>Jedn.
-                                        <input type="text" class="part-material-unit" list="materialUnits" value="${escapeHtml(part.material_unit || '')}" placeholder="kg / szt." ${canRecordProduction ? '' : 'disabled'}>
+                                        <input type="text" class="part-material-unit" value="${escapeHtml(canRecordProduction ? part.planned_unit || part.material_unit || '' : part.material_unit || part.planned_unit || '')}" readonly>
                                     </label>
                                 </div>
-                                ${canRecordProduction ? `<button type="button" class="btn production-save-btn" onclick="savePartMaterialUsage(${part.id}, this.closest('.part-material-usage'))">Zapisz zużycie w produkcji</button>` : ''}
+                                ${canRecordProduction ? `<button type="button" class="btn production-save-btn" onclick="savePartMaterialUsage(${part.id}, this.closest('.part-material-usage'))">Zapisz zużycie</button>` : ''}
                             </div>
 							<ol class="modal-steps-list" style="margin-top: 5px; padding-left: 30px;">
 									${part.steps.map(step => {
@@ -951,14 +951,19 @@
         if (button.disabled) return;
         const quantity = partBox.querySelector('.part-material-quantity').value.trim();
         const unit = partBox.querySelector('.part-material-unit').value.trim();
+        if (!quantity) {
+            showMessage('Wpisz łączną zużytą ilość. Aby wycofać zużycie, wpisz 0.', 'error');
+            return;
+        }
         button.disabled = true;
         try {
             await WeldERP.request(`/parts/${partId}/material-usage`, WeldERP.json('PUT', {
-                material_quantity: quantity || null, material_unit: unit || null
+                material_quantity: quantity, material_unit: unit || null,
+                expected_version: Number(partBox.dataset.usageVersion)
             }));
             await loadOrders();
             if (currentOpenOrderId) openModal(currentOpenOrderId);
-            showMessage('Zużycie materiału zapisane', 'success');
+            showMessage('Zapisano zużycie i rozliczono magazyn', 'success');
         } catch (error) {
             showMessage(error.message || 'Nie udało się zapisać zużycia materiału', 'error');
         } finally {

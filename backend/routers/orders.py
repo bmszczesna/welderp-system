@@ -63,8 +63,14 @@ def update_status(order_id: int, status: str, db: Session = Depends(database.get
             service.editable(order)
         if target != OrderStatus.IN_QUEUE:
             service.ensure_material_available(db, order)
-        if target == OrderStatus.COMPLETED and not order.is_approved:
-            raise HTTPException(status_code=400, detail="Wymagane jest zatwierdzenie jakości przed zakończeniem")
+        if target == OrderStatus.QUALITY_CHECK:
+            if order.status != OrderStatus.IN_PROGRESS:
+                raise HTTPException(status_code=400, detail="Do kontroli jakości można przekazać tylko zlecenie w realizacji")
+            service.ensure_production_finished(order)
+        if target == OrderStatus.COMPLETED:
+            if order.status != OrderStatus.QUALITY_CHECK or not order.is_approved:
+                raise HTTPException(status_code=400, detail="Wymagane jest zatwierdzenie jakości przed zakończeniem")
+            service.ensure_production_finished(order)
         service.change_status(db, order, target, "Zmiana statusu na tablicy Kanban")
         if target == OrderStatus.IN_PROGRESS:
             order.needs_correction = False
@@ -103,6 +109,7 @@ def approve_order(order_id: int, db: Session = Depends(database.get_db)):
     if order.status != OrderStatus.QUALITY_CHECK:
         raise HTTPException(status_code=400, detail="Zlecenie musi być w kontroli jakości")
     service.ensure_material_available(db, order)
+    service.ensure_production_finished(order)
     order.is_approved, order.needs_correction = True, False
     service.commit(db)
     return {"message": "Zlecenie zatwierdzone"}
@@ -110,6 +117,7 @@ def approve_order(order_id: int, db: Session = Depends(database.get_db)):
 
 @router.put("/orders/{order_id}/needs-correction", tags=["Zlecenia"])
 def needs_correction(order_id: int, db: Session = Depends(database.get_db)):
+    reservations.lock_inventory(db)
     order = service.get_order(db, order_id)
     if order.status != OrderStatus.QUALITY_CHECK:
         raise HTTPException(status_code=400, detail="Zlecenie musi być w kontroli jakości")
@@ -121,6 +129,7 @@ def needs_correction(order_id: int, db: Session = Depends(database.get_db)):
 
 @router.put("/parts/{part_id}/material-missing", tags=["Dane produkcyjne"])
 def material_missing(part_id: int, missing: bool = True, db: Session = Depends(database.get_db)):
+    reservations.lock_inventory(db)
     part = db.get(models.OrderPart, part_id)
     if part is None:
         raise HTTPException(status_code=404, detail="Nie znaleziono części")

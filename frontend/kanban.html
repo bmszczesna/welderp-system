@@ -318,6 +318,8 @@
             productionHint = 'Odznaczenie wykonanej operacji cofnie zlecenie do realizacji i wycofa zatwierdzenie jakości.';
         } else if (order.status === 'IN_QUEUE') {
             productionHint = 'Możesz cofnąć oznaczenie wykonania. Nowe wykonanie zapiszesz po przeniesieniu zlecenia do realizacji.';
+        } else if (order.status === 'IN_PROGRESS') {
+            productionHint = 'Przed przekazaniem do kontroli jakości wykonaj wszystkie operacje i zapisz rzeczywiste zużycie materiału przy każdej części. Zużycie musi być większe od zera i rozliczone z magazynem.';
         } else if (readOnly) {
             productionHint = 'Zlecenie jest zakończone. Rejestr produkcji jest dostępny tylko do odczytu.';
         }
@@ -859,6 +861,11 @@
             return;
         }
 
+        if (targetStatus === 'QUALITY_CHECK' && current.status !== 'IN_PROGRESS') {
+            showMessage("Do kontroli jakości można przekazać tylko zlecenie w realizacji.", "error");
+            return;
+        }
+
         if (targetStatus === 'COMPLETED' && !current.is_approved) {
             showMessage("Wymagane jest zatwierdzenie jakości przed zakończeniem!", "error");
             return;
@@ -986,9 +993,10 @@
             const res = await fetch(`/orders/${orderId}/approve`, {method: "PUT"});
             if (res.ok) {
                 showMessage("Zlecenie zatwierdzone!", "success");
-                loadOrders();
+                await loadOrders();
             } else {
-                showMessage("Błąd zatwierdzania", "error");
+                const problem = await res.json().catch(() => ({}));
+                showMessage(WeldERP.errorMessage(problem.detail || "Błąd zatwierdzania"), "error");
             }
         } catch (e) {
             showMessage("Błąd połączenia", "error");

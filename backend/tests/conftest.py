@@ -50,3 +50,21 @@ def order_payload(client, db_engine):
             "parts": [{"client_key": "part-1", "part_name": "Rama", "material": "S235",
                        "warehouse_material_id":item_id,"planned_quantity":"10",
                        "steps": [{"step_name": "Spawanie"}]}]}
+
+
+@pytest.fixture
+def finish_production(client):
+    """Prepare a valid quality handoff through the production and warehouse APIs."""
+    def finish(order_id):
+        order = client.get(f'/orders/{order_id}').json()
+        if order['status'] == 'IN_QUEUE':
+            assert client.put(f'/orders/{order_id}/status?status=IN_PROGRESS').status_code == 200
+        for part in order['parts']:
+            for step in part['steps']:
+                assert client.put(f"/steps/{step['id']}/completion", json={'is_completed': True}).status_code == 200
+            quantity = part['material_quantity'] if part['material_quantity'] else '1'
+            result = client.put(f"/parts/{part['id']}/material-usage", json={
+                'material_quantity': quantity, 'material_unit': part['planned_unit']})
+            assert result.status_code == 200, result.text
+        return client.get(f'/orders/{order_id}').json()
+    return finish

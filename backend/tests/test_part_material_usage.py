@@ -90,10 +90,11 @@ def test_invalid_part_amount_is_rejected_on_create_and_production(client, order_
 
 
 @pytest.mark.parametrize('status', ['IN_QUEUE', 'QUALITY_CHECK', 'COMPLETED', 'ARCHIVED'])
-def test_part_usage_requires_active_production(client, order_payload, status):
+def test_part_usage_requires_active_production(client, order_payload, status, finish_production):
     order = create(client, order_payload)
     order_id, part_id = order['id'], order['parts'][0]['id']
     if status != 'IN_QUEUE':
+        finish_production(order_id)
         assert client.put(f'/orders/{order_id}/status?status=QUALITY_CHECK').status_code == 200
         if status in ('COMPLETED', 'ARCHIVED'):
             assert client.put(f'/orders/{order_id}/approve').status_code == 200

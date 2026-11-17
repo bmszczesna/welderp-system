@@ -87,6 +87,14 @@ z ostrzeżeniem, ile brakuje. Nie można przesunąć go do realizacji ani kolejn
 do czasu uzupełnienia zapasu. Blokadę sprawdza także serwer. Brak wyboru materiału lub
 potrzebnej ilości również blokuje dalszą pracę, w tym przy starszych zleceniach.
 
+Do kontroli jakości można przekazać tylko zlecenie w realizacji, z wykonanymi wszystkimi
+operacjami i dodatnim zużyciem zapisanym przy każdej części. Zużycie musi być zgodne
+z jednostką materiału i rozliczone w historii magazynu; sam dawny wpis produkcyjny
+nie wystarcza. Te same warunki serwer sprawdza ponownie przy zatwierdzeniu jakości
+i zakończeniu. Zakończenie wymaga zatwierdzenia w kontroli jakości. Rzeczywiste zużycie
+może być mniejsze od planowanego — zakończenie zwalnia wyłącznie niewykorzystaną rezerwację,
+bez dodatkowego wydania materiału. Zero służy do wycofania zużycia, nie do zamknięcia produkcji.
+
 Po przyjęciu materiału system automatycznie uzupełnia brakujące rezerwacje według kolejności
 utworzenia części. Istniejące rezerwacje są zachowane, więc edycja starszego zlecenia
 nie zabiera zapasu innym. Zmniejszenie potrzeb, usunięcie części lub zlecenia oraz zamknięcie

@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from backend import auth, database, material_usage, models, order_service as service
+from backend import auth, database, material_usage, models, order_service as service, reservations
 from backend.models import OrderStatus
 from backend.schemas import PartMaterialUsage, StepCompletion, StepProductionRecord
 
@@ -11,6 +11,9 @@ router = APIRouter()
 
 
 def get_step(db, step_id):
+    # Serialize completion/undo with quality approval and order closure before
+    # reading their status, not only when committing an already stale edit.
+    reservations.lock_inventory(db)
     step = db.get(models.ProcessStep, step_id)
     if step is None:
         raise HTTPException(status_code=404, detail="Nie znaleziono operacji")

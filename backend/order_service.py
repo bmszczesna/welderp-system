@@ -1,5 +1,6 @@
 """Transactional writes shared by the order and production endpoints."""
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
@@ -66,6 +67,36 @@ def ensure_material_available(db, order):
     reservations.ensure_order_ready(db, order)
     if has_missing_material(order):
         raise HTTPException(status_code=400, detail="Najpierw uzupełnij brakujący materiał przy wszystkich częściach")
+
+
+def ensure_production_finished(order):
+    """Validate actual production and its ledger without issuing stock implicitly.
+
+    Call after ensure_material_available, under the inventory transaction lock,
+    so consumption, reservations and the production records are freshly loaded.
+    Actual consumption may be lower than the plan; only unused stock is released.
+    """
+    problems = []
+    if not order.parts:
+        problems.append("Zlecenie nie zawiera części.")
+    for part in order.parts:
+        unfinished = [step.step_name for step in part.steps if not step.is_completed]
+        if not part.steps:
+            problems.append(f"{part.part_name}: dodaj i wykonaj operacje.")
+        elif unfinished:
+            problems.append(f"{part.part_name}: niewykonane operacje: {', '.join(unfinished)}.")
+        try:
+            quantity = Decimal(str(part.material_quantity))
+        except (InvalidOperation, TypeError, ValueError):
+            quantity = Decimal("NaN")
+        if not quantity.is_finite() or quantity <= 0:
+            problems.append(f"{part.part_name}: zapisz zużycie materiału większe od zera podczas realizacji.")
+        elif (not part.planned_material or part.material_unit != part.planned_unit
+              or quantity != part.issued_quantity):
+            problems.append(f"{part.part_name}: zużycie nie jest rozliczone z magazynem. "
+                            "Wróć do realizacji i użyj „Zapisz zużycie”.")
+    if problems:
+        raise HTTPException(status_code=400, detail="Nie można zatwierdzić produkcji. " + " ".join(problems))
 
 
 def duplicate_number(db, number, exclude=None):

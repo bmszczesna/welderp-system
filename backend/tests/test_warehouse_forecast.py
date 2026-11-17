@@ -140,15 +140,17 @@ def test_cancelled_and_overdue_deliveries_do_not_cover_demand(manager, order_pay
     assert data['overdue_deliveries'] == 1
 
 
-def test_terminal_orders_excluded_and_unplanned_reported(manager, order_payload):
+def test_terminal_orders_excluded_and_unplanned_reported(manager, order_payload, finish_production):
     item_id = material(manager)
     saved = order(manager, order_payload, item_id, '80', 1)
+    finish_production(saved['id'])
     for status in ('QUALITY_CHECK','COMPLETED','ARCHIVED'):
         if status == 'COMPLETED':
             assert manager.put(f"/orders/{saved['id']}/approve").status_code == 200
         assert manager.put(f"/orders/{saved['id']}/status?status={status}").status_code == 200
     unplanned = order(manager, order_payload)
-    assert number(forecast(manager, item_id)['tomorrow_quantity']) == 100
+    # One unit was consumed; the remaining 79 units of the closed plan are excluded.
+    assert number(forecast(manager, item_id)['tomorrow_quantity']) == 99
     data = manager.get(BASE+'/forecast', params={'as_of':DAY.isoformat()}).json()
     assert data['unplanned_parts'] == 1
 

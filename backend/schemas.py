@@ -10,7 +10,7 @@ from backend.models import OrderStatus
 Name = Annotated[str, Field(min_length=1, max_length=255)]
 Identifier = Annotated[int, Field(gt=0)]
 UsageQuantity = Annotated[Decimal, Field(ge=0, le=Decimal('999999999.999999'),
-                                          max_digits=15, decimal_places=6)]
+                                         max_digits=15, decimal_places=6)]
 
 # Units are normalized, not converted: 1000 g remains 1000 g, not 1 kg.
 UNIT_ALIASES = {
@@ -124,7 +124,8 @@ class PartCreate(MaterialAmount):
     client_key: Optional[str] = Field(default=None, max_length=100)
     steps: list[StepCreate] = Field(min_length=1)
     warehouse_material_id: Optional[Identifier] = None
-    planned_quantity: Optional[Annotated[Decimal, Field(gt=0, le=Decimal('999999999.999999'), max_digits=15, decimal_places=6)]] = None
+    planned_quantity: Optional[
+        Annotated[Decimal, Field(gt=0, le=Decimal('999999999.999999'), max_digits=15, decimal_places=6)]] = None
     planned_for: Optional[date] = None
 
     @field_validator("planned_quantity", mode="before")
@@ -248,6 +249,14 @@ class PartResponse(ORMResponse):
     pdfs: list[PDFResponse] = Field(default_factory=list)
 
 
+class StatusEventResponse(ORMResponse):
+    id: int
+    from_status: Optional[OrderStatus] = None
+    to_status: OrderStatus
+    occurred_at: datetime
+    reason: str
+
+
 class OrderResponse(ORMResponse):
     id: int
     order_number: str
@@ -264,13 +273,7 @@ class OrderResponse(ORMResponse):
     operator: Optional[str] = None
     parts: list[PartResponse]
 
-
-class StatusEventResponse(ORMResponse):
-    id: int
-    from_status: Optional[OrderStatus] = None
-    to_status: OrderStatus
-    occurred_at: datetime
-    reason: str
+    status_events: list[StatusEventResponse] = Field(default_factory=list)
 
 
 class AlertItem(BaseModel):

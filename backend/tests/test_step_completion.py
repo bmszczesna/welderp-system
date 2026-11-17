@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 
 @pytest.fixture
-def completed_operation(client, order_payload):
+def completed_operation(client, order_payload, finish_production):
     created = client.post('/orders/', json=order_payload)
     assert created.status_code == 201
     order_id = created.json()['order_id']
@@ -17,7 +17,7 @@ def completed_operation(client, order_payload):
         'production_notes': 'Zachowaj uwagi przy cofnięciu wykonania',
         'material_used': 'S235', 'material_quantity': '2,4', 'material_unit': 'kg',
     }).status_code == 200
-    return client.get(f'/orders/{order_id}').json()
+    return finish_production(order_id)
 
 
 def assert_undone(order, original):
@@ -104,13 +104,17 @@ def test_finished_orders_remain_read_only(client, completed_operation, status, c
 
 
 @pytest.mark.parametrize('status', ['IN_QUEUE', 'QUALITY_CHECK'])
-def test_cannot_mark_new_completion_outside_production(client, order_payload, status):
+def test_cannot_mark_new_completion_outside_production(client, order_payload, status, db_engine):
     created = client.post('/orders/', json=order_payload).json()
     order_id = created['order_id']
     order = client.get(f'/orders/{order_id}').json()
     step_id = order['parts'][0]['steps'][0]['id']
     if status == 'QUALITY_CHECK':
-        assert client.put(f'/orders/{order_id}/status?status=QUALITY_CHECK').status_code == 200
+        # An incomplete quality record can still exist in a legacy database.
+        from backend import models
+        with Session(db_engine) as db:
+            db.get(models.Order, order_id).status = models.OrderStatus.QUALITY_CHECK
+            db.commit()
     assert client.put(f'/steps/{step_id}/completion', json={'is_completed': True}).status_code == 400
     assert client.get(f'/orders/{order_id}').json()['parts'][0]['steps'][0]['is_completed'] is False
 

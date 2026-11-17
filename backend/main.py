@@ -15,11 +15,11 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend import database, models, settings
+from backend import auth, database, models, settings
 from backend.integrations import HTML, get_ai_model
 from backend.migrations import initialize_database
 from backend.models import OrderStatus
-from backend.routers import alerts, orders, production, users
+from backend.routers import alerts, orders, production, users, warehouse
 
 settings.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -35,6 +35,7 @@ app.include_router(orders.router)
 app.include_router(production.router)
 app.include_router(users.router)
 app.include_router(alerts.router)
+app.include_router(warehouse.router)
 app.mount("/frontend", StaticFiles(directory=settings.ROOT_DIR / "frontend"), name="frontend")
 app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 
@@ -64,8 +65,8 @@ def serve_order_form():
 
 
 @app.get("/kanban.html")
-def serve_kanban(request: Request):
-    if request.cookies.get("logged_in") != "true":
+def serve_kanban(user=Depends(auth.optional_user)):
+    if user is None:
         return RedirectResponse(url="/frontend/login.html")
     return FileResponse(settings.ROOT_DIR / "frontend/kanban.html")
 
@@ -416,7 +417,6 @@ def generate_order_pdf(order_id: int, db: Session = Depends(database.get_db)):
     )
 
 
-
 @app.get("/reports/ai-pdf")
 def get_ai_report_pdf(db: Session = Depends(database.get_db)):
     # 1. Pobieranie danych z bazy
@@ -637,23 +637,32 @@ def generate_order_ai_summary(
         }
     )
 
+
 @app.get("/reports/archive-ai-pdf")
 def get_archive_ai_report(
 
         date_from: Optional[str] = None,
         date_to: Optional[str] = None,
+        client: Optional[str] = None,
         db: Session = Depends(database.get_db)
 ):
-
     ai_model = get_ai_model()
     query = db.query(models.Order).filter(
         models.Order.status == OrderStatus.ARCHIVED
     )
 
+    # FILTR PO NAZWIE KLIENTA
+
+    if client and client.strip():
+        query = query.filter(
+            models.Order.client_name.ilike(
+                f"%{client.strip()}%"
+            )
+        )
+
     # FILTR DAT OD
 
     if date_from:
-
         query = query.filter(
 
             models.Order.date_received >=
@@ -663,7 +672,6 @@ def get_archive_ai_report(
     # FILTR DAT DO
 
     if date_to:
-
         end_date = datetime.fromisoformat(
             date_to
         ).replace(
@@ -679,6 +687,12 @@ def get_archive_ai_report(
         )
 
     orders = query.all()
+
+    if not orders:
+        raise HTTPException(
+            status_code=404,
+            detail="Brak zarchiwizowanych zleceń spełniających wybrane filtry."
+        )
 
     # STATYSTYKI ERP
 
@@ -697,10 +711,9 @@ def get_archive_ai_report(
         # operatorzy
 
         if o.operator:
-
             operators[o.operator] = (
 
-                operators.get(o.operator, 0) + 1
+                    operators.get(o.operator, 0) + 1
             )
 
         # terminowość
@@ -708,13 +721,11 @@ def get_archive_ai_report(
         if o.date_deadline and o.date_received:
 
             if o.date_received <= o.date_deadline:
-
                 completed_on_time += 1
 
         # części i kroki
 
         for p in o.parts:
-
             all_parts.append(p.part_name)
 
             total_steps += len(p.steps)
@@ -735,7 +746,6 @@ def get_archive_ai_report(
     on_time_percent = 0
 
     if total_orders > 0:
-
         on_time_percent = round(
 
             (completed_on_time / total_orders) * 100,
@@ -747,7 +757,6 @@ def get_archive_ai_report(
     avg_steps = 0
 
     if total_orders > 0:
-
         avg_steps = round(
             total_steps / total_orders,
             2

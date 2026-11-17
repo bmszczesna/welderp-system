@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
-from backend import database, models, order_service as service
+from backend import auth, database, material_usage, models, order_service as service, reservations
 from backend.models import OrderStatus
 from backend.schemas import PartMaterialUsage, StepCompletion, StepProductionRecord
 
@@ -11,6 +11,9 @@ router = APIRouter()
 
 
 def get_step(db, step_id):
+    # Serialize completion/undo with quality approval and order closure before
+    # reading their status, not only when committing an already stale edit.
+    reservations.lock_inventory(db)
     step = db.get(models.ProcessStep, step_id)
     if step is None:
         raise HTTPException(status_code=404, detail="Nie znaleziono operacji")
@@ -20,7 +23,7 @@ def get_step(db, step_id):
 def get_active_step(db, step_id):
     step = get_step(db, step_id)
     order = step.owner_part.owner
-    service.ensure_material_available(order)
+    service.ensure_material_available(db, order)
     if order.status != OrderStatus.IN_PROGRESS:
         raise HTTPException(status_code=400, detail="Wykonanie operacji zapisuje się podczas realizacji zlecenia")
     return step
@@ -30,7 +33,7 @@ def set_completion(db, step, completed):
     order = step.owner_part.owner
     service.editable(order)
     if completed:
-        service.ensure_material_available(order)
+        service.ensure_material_available(db, order)
         if order.status != OrderStatus.IN_PROGRESS:
             raise HTTPException(status_code=400, detail="Wykonanie operacji zapisuje się podczas realizacji zlecenia")
     if step.is_completed == completed:
@@ -58,21 +61,18 @@ def completion_response(step):
 
 
 @router.put("/parts/{part_id}/material-usage", tags=["Dane produkcyjne"])
-def part_material_usage(part_id: int, usage: PartMaterialUsage, db: Session = Depends(database.get_db)):
-    part = db.get(models.OrderPart, part_id)
-    if part is None:
-        raise HTTPException(status_code=404, detail="Nie znaleziono części")
-    order = part.owner
-    service.editable(order)
-    service.ensure_material_available(order)
-    if order.status != OrderStatus.IN_PROGRESS:
-        raise HTTPException(status_code=400, detail="Zużycie materiału zapisuje się podczas realizacji zlecenia")
-    if usage.material_quantity is not None and not part.material:
-        raise HTTPException(status_code=422, detail="Podaj materiał części przed zapisaniem zużycia")
-    part.material_quantity, part.material_unit = usage.material_quantity, usage.material_unit
-    service.commit(db)
-    return {"message": "Zużycie materiału zapisane", "part_id": part.id,
-            "material_quantity": part.material_quantity, "material_unit": part.material_unit}
+def part_material_usage(part_id: int, usage: PartMaterialUsage, db: Session = Depends(database.get_db),
+                        user=Depends(auth.require_user)):
+    try:
+        part = material_usage.reconcile(db, part_id, usage)
+        service.commit(db)
+        return {"message": "Zapisano zużycie i rozliczono magazyn", "part_id": part.id,
+                "material_quantity": part.material_quantity, "material_unit": part.material_unit,
+                "material_usage_version": part.material_usage_version, "issued_quantity": part.issued_quantity,
+                "reserved_quantity": part.reserved_quantity}
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.put("/steps/{step_id}/completion", tags=["Dane produkcyjne"])

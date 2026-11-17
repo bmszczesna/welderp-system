@@ -255,6 +255,8 @@ def test_full_pipeline_completion_and_archive(client, order_payload):
     assert client.put(f'/orders/{order_id}/status?status=IN_PROGRESS').status_code == 200
     assert client.put(f'/steps/{step_id}/production-record', json={
         'is_completed': True, 'material_quantity': '1,5', 'material_unit': ' KG ', 'completed_by': ' Operator '}).status_code == 200
+    assert client.put(f'/parts/{part_id}/material-usage', json={
+        'material_quantity': '1,5', 'material_unit': 'kg'}).status_code == 200
     assert client.put(f'/orders/{order_id}/status?status=QUALITY_CHECK').status_code == 200
     assert client.put(f'/orders/{order_id}/status?status=COMPLETED').status_code == 400
     assert client.put(f'/orders/{order_id}/approve').status_code == 200

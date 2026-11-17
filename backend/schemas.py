@@ -1,5 +1,6 @@
 """Input validation and the public API contract for weeks 1 to 3."""
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Annotated, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -8,6 +9,8 @@ from backend.models import OrderStatus
 
 Name = Annotated[str, Field(min_length=1, max_length=255)]
 Identifier = Annotated[int, Field(gt=0)]
+UsageQuantity = Annotated[Decimal, Field(ge=0, le=Decimal('999999999.999999'),
+                                         max_digits=15, decimal_places=6)]
 
 # Units are normalized, not converted: 1000 g remains 1000 g, not 1 kg.
 UNIT_ALIASES = {
@@ -82,7 +85,8 @@ class MaterialRecord(MaterialAmount):
 
 
 class PartMaterialUsage(MaterialAmount):
-    pass
+    material_quantity: Optional[UsageQuantity] = None
+    expected_version: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
 
 
 class StepCreate(MaterialRecord):
@@ -119,6 +123,25 @@ class PartCreate(MaterialAmount):
     operator: Optional[str] = Field(default=None, max_length=255)
     client_key: Optional[str] = Field(default=None, max_length=100)
     steps: list[StepCreate] = Field(min_length=1)
+    warehouse_material_id: Optional[Identifier] = None
+    planned_quantity: Optional[
+        Annotated[Decimal, Field(gt=0, le=Decimal('999999999.999999'), max_digits=15, decimal_places=6)]] = None
+    planned_for: Optional[date] = None
+
+    @field_validator("planned_quantity", mode="before")
+    @classmethod
+    def normalize_plan(cls, value):
+        if isinstance(value, bool):
+            raise ValueError("Zapotrzebowanie musi być liczbą")
+        return value.strip().replace(',', '.') if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def complete_plan(self):
+        if (self.warehouse_material_id is None) != (self.planned_quantity is None):
+            raise ValueError("Wybierz materiał z magazynu i podaj planowaną ilość")
+        if self.planned_for is not None and self.warehouse_material_id is None:
+            raise ValueError("Data zużycia wymaga materiału i planowanej ilości")
+        return self
 
     @model_validator(mode="after")
     def quantity_requires_material(self):
@@ -129,6 +152,7 @@ class PartCreate(MaterialAmount):
 
 class PartUpdate(PartCreate):
     id: Optional[Identifier] = None
+    material_quantity: Optional[UsageQuantity] = None
     steps: list[StepUpdate] = Field(min_length=1)
 
 
@@ -208,11 +232,29 @@ class PartResponse(ORMResponse):
     position: int = 0
     material: Optional[str] = None
     material_missing: bool = False
+    warehouse_material_id: Optional[int] = None
+    planned_quantity: Optional[Decimal] = None
+    planned_for: Optional[date] = None
+    planned_unit: Optional[str] = None
+    planned_material_name: Optional[str] = None
+    reserved_quantity: Decimal = Decimal('0')
+    issued_quantity: Decimal = Decimal('0')
+    remaining_quantity: Decimal = Decimal('0')
+    shortage_quantity: Decimal = Decimal('0')
     material_quantity: Optional[float] = None
     material_unit: Optional[str] = None
+    material_usage_version: int = 0
     operator: Optional[str] = None
     steps: list[StepResponse] = Field(default_factory=list)
     pdfs: list[PDFResponse] = Field(default_factory=list)
+
+
+class StatusEventResponse(ORMResponse):
+    id: int
+    from_status: Optional[OrderStatus] = None
+    to_status: OrderStatus
+    occurred_at: datetime
+    reason: str
 
 
 class OrderResponse(ORMResponse):
@@ -222,6 +264,8 @@ class OrderResponse(ORMResponse):
     status: OrderStatus
     is_approved: bool = False
     needs_correction: bool = False
+    materials_ready: bool = True
+    material_warnings: list[str] = Field(default_factory=list)
     date_received: Optional[datetime] = None
     date_deadline: Optional[datetime] = None
     status_changed_at: Optional[datetime] = None
@@ -229,13 +273,7 @@ class OrderResponse(ORMResponse):
     operator: Optional[str] = None
     parts: list[PartResponse]
 
-
-class StatusEventResponse(ORMResponse):
-    id: int
-    from_status: Optional[OrderStatus] = None
-    to_status: OrderStatus
-    occurred_at: datetime
-    reason: str
+    status_events: list[StatusEventResponse] = Field(default_factory=list)
 
 
 class AlertItem(BaseModel):

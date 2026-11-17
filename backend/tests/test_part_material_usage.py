@@ -33,10 +33,13 @@ def test_part_amount_create_edit_and_read_contract(client, order_payload):
     after = client.get(f"/orders/{order['id']}").json()['parts'][0]
     assert after == part  # Omitting material consumption from structural edits preserves it.
     payload = edit(order)
-    payload['parts'][0].update(material_quantity='2,75', material_unit='m²')
+    payload['parts'][0].update(material_quantity='2,75', material_unit='kg')
+    assert client.put(f"/orders/{order['id']}", json=payload).status_code == 400
+    assert client.put(f"/orders/{order['id']}/status?status=IN_PROGRESS").status_code == 200
     assert client.put(f"/orders/{order['id']}", json=payload).status_code == 200
     part = client.get(f"/orders/{order['id']}").json()['parts'][0]
-    assert part['material_quantity'] == 2.75 and part['material_unit'] == 'm2'
+    assert part['material_quantity'] == 2.75 and part['material_unit'] == 'kg'
+    assert float(part['issued_quantity']) == 2.75
 
 
 def test_part_usage_and_checkbox_preserve_legacy_step_records(client, order_payload):
@@ -87,10 +90,11 @@ def test_invalid_part_amount_is_rejected_on_create_and_production(client, order_
 
 
 @pytest.mark.parametrize('status', ['IN_QUEUE', 'QUALITY_CHECK', 'COMPLETED', 'ARCHIVED'])
-def test_part_usage_requires_active_production(client, order_payload, status):
+def test_part_usage_requires_active_production(client, order_payload, status, finish_production):
     order = create(client, order_payload)
     order_id, part_id = order['id'], order['parts'][0]['id']
     if status != 'IN_QUEUE':
+        finish_production(order_id)
         assert client.put(f'/orders/{order_id}/status?status=QUALITY_CHECK').status_code == 200
         if status in ('COMPLETED', 'ARCHIVED'):
             assert client.put(f'/orders/{order_id}/approve').status_code == 200
@@ -139,6 +143,7 @@ def test_old_material_migration_does_not_mix_units_or_erase_history():
     with engine.begin() as connection:
         connection.execute(text('ALTER TABLE order_parts DROP COLUMN material_quantity'))
         connection.execute(text('ALTER TABLE order_parts DROP COLUMN material_unit'))
+        connection.execute(text('ALTER TABLE order_parts DROP COLUMN material_usage_version'))
         connection.execute(text("INSERT INTO orders(id, order_number) VALUES (1, 'LEGACY')"))
         for part_id in (1, 2, 3):
             connection.execute(text("INSERT INTO order_parts(id,part_name,material,order_id,position) VALUES (:id,'Rama','S235',1,0)"), {'id': part_id})
@@ -153,6 +158,7 @@ def test_old_material_migration_does_not_mix_units_or_erase_history():
         before = connection.execute(text('SELECT * FROM process_steps ORDER BY id')).all()
     initialize_database(engine)
     with engine.begin() as connection:
+        assert connection.execute(text('SELECT material_usage_version FROM order_parts')).all() == [(0,), (0,), (0,)]
         assert connection.execute(text('SELECT id,material_quantity,material_unit FROM order_parts ORDER BY id')).all() == [
             (1, 4.0, 'kg'), (2, None, None), (3, None, None)]
         assert connection.execute(text('SELECT * FROM process_steps ORDER BY id')).all() == before

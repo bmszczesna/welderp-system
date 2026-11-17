@@ -1,18 +1,21 @@
 """Transactional writes shared by the order and production endpoints."""
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
-from backend import models
+from backend import auth, material_usage, models, warehouse, reservations
 from backend.models import OrderStatus
+from backend.schemas import PartMaterialUsage
 
 
 def order_query(db):
     return db.query(models.Order).options(
         selectinload(models.Order.parts).selectinload(models.OrderPart.steps),
         selectinload(models.Order.parts).selectinload(models.OrderPart.pdfs),
+        selectinload(models.Order.parts).selectinload(models.OrderPart.planned_material),
     )
 
 
@@ -25,6 +28,7 @@ def get_order(db, order_id):
 
 def commit(db):
     try:
+        reservations.synchronize(db)
         db.commit()
     except IntegrityError as exc:
         db.rollback()
@@ -59,9 +63,40 @@ def has_missing_material(order):
     return any(part.material_missing for part in order.parts)
 
 
-def ensure_material_available(order):
+def ensure_material_available(db, order):
+    reservations.ensure_order_ready(db, order)
     if has_missing_material(order):
         raise HTTPException(status_code=400, detail="Najpierw uzupełnij brakujący materiał przy wszystkich częściach")
+
+
+def ensure_production_finished(order):
+    """Validate actual production and its ledger without issuing stock implicitly.
+
+    Call after ensure_material_available, under the inventory transaction lock,
+    so consumption, reservations and the production records are freshly loaded.
+    Actual consumption may be lower than the plan; only unused stock is released.
+    """
+    problems = []
+    if not order.parts:
+        problems.append("Zlecenie nie zawiera części.")
+    for part in order.parts:
+        unfinished = [step.step_name for step in part.steps if not step.is_completed]
+        if not part.steps:
+            problems.append(f"{part.part_name}: dodaj i wykonaj operacje.")
+        elif unfinished:
+            problems.append(f"{part.part_name}: niewykonane operacje: {', '.join(unfinished)}.")
+        try:
+            quantity = Decimal(str(part.material_quantity))
+        except (InvalidOperation, TypeError, ValueError):
+            quantity = Decimal("NaN")
+        if not quantity.is_finite() or quantity <= 0:
+            problems.append(f"{part.part_name}: zapisz zużycie materiału większe od zera podczas realizacji.")
+        elif (not part.planned_material or part.material_unit != part.planned_unit
+              or quantity != part.issued_quantity):
+            problems.append(f"{part.part_name}: zużycie nie jest rozliczone z magazynem. "
+                            "Wróć do realizacji i użyj „Zapisz zużycie”.")
+    if problems:
+        raise HTTPException(status_code=400, detail="Nie można zatwierdzić produkcji. " + " ".join(problems))
 
 
 def duplicate_number(db, number, exclude=None):
@@ -95,7 +130,8 @@ def validate_step_material(part, step):
         raise HTTPException(status_code=422, detail="Podaj materiał przy części lub operacji z podaną ilością")
 
 
-def create_order(db, payload):
+def create_order(db, payload, user=None):
+    reservations.lock_inventory(db)
     duplicate_number(db, payload.order_number)
     order = models.Order(order_number=payload.order_number, client_name=payload.client_name,
                          date_received=payload.date_received, date_deadline=payload.date_deadline,
@@ -109,6 +145,7 @@ def create_order(db, payload):
                                 operator=data.operator, position=index,
                                 material_quantity=data.material_quantity, material_unit=data.material_unit)
         order.parts.append(part)
+        warehouse.apply_part_plan(db, part, data, user)
         for step_index, step_data in enumerate(data.steps):
             step = models.ProcessStep()
             write_step(step, step_data, step_index)
@@ -118,7 +155,8 @@ def create_order(db, payload):
     return order
 
 
-def update_order(db, order, payload):
+def update_order(db, order, payload, user=None):
+    reservations.lock_inventory(db)
     editable(order)
     duplicate_number(db, payload.order_number, exclude=order.id)
     if order.date_received and payload.date_deadline.date() < order.date_received.date():
@@ -140,15 +178,18 @@ def update_order(db, order, payload):
     order.is_approved = False
     removed_paths = []
     updated_parts = []
+    usage_updates = []
     for position, data in enumerate(payload.parts):
         part = existing_parts.get(data.id)
         if part is None:
             part = models.OrderPart()
         part.part_name, part.material, part.operator, part.position = (
             data.part_name, data.material, data.operator, position)
-        for field in ("material_quantity", "material_unit"):
-            if field in data.model_fields_set:
-                setattr(part, field, getattr(data, field))
+        warehouse.apply_part_plan(db, part, data, user)
+        if {"material_quantity", "material_unit"} & data.model_fields_set:
+            auth.require_user(user)
+            usage_updates.append((part, PartMaterialUsage(
+                material_quantity=data.material_quantity, material_unit=data.material_unit)))
         if part.material_quantity is not None and not part.material:
             raise HTTPException(status_code=422, detail="Podaj materiał części z zapisaną ilością")
         existing_steps = {step.id: step for step in part.steps}
@@ -163,9 +204,13 @@ def update_order(db, order, payload):
     kept_ids = {part.id for part in updated_parts if part.id is not None}
     for old_part in order.parts:
         if old_part.id not in kept_ids:
+            warehouse.detach_part_history(db, old_part.id)
             removed_paths.extend(pdf.file_path for pdf in old_part.pdfs)
     order.parts = updated_parts
-    if has_missing_material(order):
+    reservations.synchronize(db)
+    for part, usage in usage_updates:
+        material_usage.reconcile(db, part.id, usage)
+    if not order.materials_ready:
         change_status(db, order, OrderStatus.IN_QUEUE, "Edycja zlecenia z brakującym materiałem")
     commit(db)
     return removed_paths

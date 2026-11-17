@@ -16,6 +16,7 @@
             <div class="actions">
                 <button class="btn" type="button" onclick="window.location.href='/kanban.html'">Tablica Kanban</button>
                 <button class="btn" type="button" onclick="window.location.href='/archive.html'">Archiwum</button>
+                <button class="btn" type="button" data-manager-only hidden onclick="window.location.href='/frontend/warehouse.html'">Magazyn</button>
                 <button class="btn btn-primary" type="button" id="refreshAlerts">Odśwież alerty</button>
             </div>
         </header>
@@ -48,7 +49,7 @@
         <p id="alertsMessage" class="message alerts-message" role="status" hidden></p>
         <section id="alertsList" class="alerts-list" aria-label="Lista alertów" aria-live="polite"></section>
     </main>
-    <script src="/frontend/js/api.js"></script>
+    <script src="/frontend/js/api.js?v=manager-planning-1"></script>
     <script src="/frontend/js/alerts.js"></script>
 </body>
 </html>

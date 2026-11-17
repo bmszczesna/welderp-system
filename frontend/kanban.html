@@ -1,299 +1,347 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>WeldERP</title>
-	<link rel="stylesheet" href="/frontend/css/kanban.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeldERP</title>
+    <link rel="stylesheet" href="/frontend/css/kanban.css">
+    <link rel="stylesheet" href="/frontend/css/material-plan.css?v=komunikaty-1">
 </head>
 <body>
-	<main class="page">
-		<header class="topbar">
-			<div>
-				<h1 class="title">WeldERP</h1>
-			</div>
-			<div class="actions">
-				<button class="btn" onclick="openOperatorModal()">Operatorzy</button>
-				<button class="btn" type="button" onclick="window.location.href='/frontend/alerts.html'">Alerty</button>
-				<button class="btn" type="button" id="refreshBtn">Odśwież</button>
-				<button class="btn" type="button" onclick="downloadAIReport()" >Raport AI</button>
-				<button class="btn btn-primary" type="button" id="newOrderBtn">+ Nowe zlecenie</button>
-				<button class="btn" onclick="window.location.href='/archive.html'">Archiwum</button>
-				<button class="btn" onclick="logout()" style="background: #fee2e2; color: #ef4444; border: none;">Wyloguj</button>
-			</div>
-		</header>
+<main class="page">
+    <header class="topbar">
+        <div>
+            <h1 class="title">WeldERP</h1>
+        </div>
+        <div class="actions">
+            <button class="btn" onclick="openOperatorModal()">Operatorzy</button>
+            <button class="btn" type="button" onclick="window.location.href='/frontend/alerts.html'">Alerty</button>
+            <button class="btn" type="button" data-manager-only hidden
+                    onclick="window.location.href='/frontend/warehouse.html'">Magazyn
+            </button>
+            <button class="btn" type="button" id="refreshBtn">Odśwież</button>
+            <button class="btn" type="button" onclick="downloadAIReport()">Raport AI</button>
+            <button class="btn btn-primary" type="button" id="newOrderBtn">+ Nowe zlecenie</button>
+            <button class="btn" onclick="window.location.href='/archive.html'">Archiwum</button>
+            <button class="btn" onclick="logout()" style="background: #fee2e2; color: #ef4444; border: none;">Wyloguj
+            </button>
+        </div>
+    </header>
 
-		<div class="search-message-row">
-			<p id="message" class="message" hidden></p>
-			<div class="search-wrap">
-				<input id="searchInput" class="search" type="search" placeholder="Szukaj zlecenia...">
-			</div>
-		</div>
+    <div class="search-message-row">
+        <p id="message" class="message" hidden></p>
+        <div class="search-wrap">
+            <input id="searchInput" class="search" type="search" placeholder="Szukaj zlecenia...">
+        </div>
+    </div>
 
-		<section class="board" aria-label="Kanban board">
-			<article class="column queue">
-				<div class="column-head">
-					<h2 class="column-title"><span class="dot" style="background: var(--queue);"></span>Oczekujące</h2>
-					<span class="count" id="count-IN_QUEUE">0</span>
-				</div>
-				<div class="cards" id="col-in-queue" data-status="IN_QUEUE"></div>
-			</article>
+    <section class="board" aria-label="Kanban board">
+        <article class="column queue">
+            <div class="column-head">
+                <h2 class="column-title"><span class="dot" style="background: var(--queue);"></span>Oczekujące</h2>
+                <span class="count" id="count-IN_QUEUE">0</span>
+            </div>
+            <div class="cards" id="col-in-queue" data-status="IN_QUEUE"></div>
+        </article>
 
-			<article class="column progress">
-				<div class="column-head">
-					<h2 class="column-title"><span class="dot" style="background: var(--progress);"></span>Realizacja</h2>
-					<span class="count" id="count-IN_PROGRESS">0</span>
-				</div>
-				<div class="cards" id="col-in-progress" data-status="IN_PROGRESS"></div>
-			</article>
+        <article class="column progress">
+            <div class="column-head">
+                <h2 class="column-title"><span class="dot" style="background: var(--progress);"></span>Realizacja</h2>
+                <span class="count" id="count-IN_PROGRESS">0</span>
+            </div>
+            <div class="cards" id="col-in-progress" data-status="IN_PROGRESS"></div>
+        </article>
 
-			<article class="column quality">
-				<div class="column-head">
-					<h2 class="column-title"><span class="dot" style="background: var(--quality);"></span>Kontrola jakości</h2>
-					<span class="count" id="count-QUALITY_CHECK">0</span>
-				</div>
-				<div class="cards" id="col-quality-check" data-status="QUALITY_CHECK"></div>
-			</article>
+        <article class="column quality">
+            <div class="column-head">
+                <h2 class="column-title"><span class="dot" style="background: var(--quality);"></span>Kontrola jakości
+                </h2>
+                <span class="count" id="count-QUALITY_CHECK">0</span>
+            </div>
+            <div class="cards" id="col-quality-check" data-status="QUALITY_CHECK"></div>
+        </article>
 
-			<article class="column done">
-				<div class="column-head">
-					<h2 class="column-title"><span class="dot" style="background: var(--done);"></span>Zakończone</h2>
-					<span class="count" id="count-COMPLETED">0</span>
-				</div>
-				<div class="cards" id="col-completed" data-status="COMPLETED"></div>
-			</article>
-		</section>
-	</main>
+        <article class="column done">
+            <div class="column-head">
+                <h2 class="column-title"><span class="dot" style="background: var(--done);"></span>Zakończone</h2>
+                <span class="count" id="count-COMPLETED">0</span>
+            </div>
+            <div class="cards" id="col-completed" data-status="COMPLETED"></div>
+        </article>
+    </section>
+</main>
 <datalist id="materialUnits"></datalist>
 
-	<div id="orderModal" class="modal-overlay" style="display:none;">
-		<div class="modal-box" style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;">
-			<span class="modal-close" onclick="closeModal()">&times;</span>
+<div id="orderModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width: 800px; width: 90%; max-height: 90vh; overflow-y: auto;">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
 
-			<div id="modalViewContainer">
-				<div class="modal-header">
-					<h2 id="modalOrderNumber">Zlecenie: 000</h2>
-				</div>
+        <div id="modalViewContainer">
+            <div class="modal-header">
+                <h2 id="modalOrderNumber">Zlecenie: 000</h2>
+            </div>
 
-				<div class="info-grid">
-					<div class="info-box"><span>Klient</span><strong id="modalClient">-</strong></div>
-					<div class="info-box"><span>Operator</span><strong id="modalOperator">-</strong></div>
-					<div class="info-box"><span>Data otrzymania</span><strong id="modalDateReceived">-</strong></div>
-					<div class="info-box"><span>Termin</span><strong id="modalDeadline" style="color: #ef4444;">-</strong></div>
-					<div class="info-box"><span>Status</span><strong id="modalStatus">-</strong></div>
-				</div>
+            <div class="info-grid">
+                <div class="info-box"><span>Klient</span><strong id="modalClient">-</strong></div>
+                <div class="info-box"><span>Operator</span><strong id="modalOperator">-</strong></div>
+                <div class="info-box"><span>Data otrzymania</span><strong id="modalDateReceived">-</strong></div>
+                <div class="info-box"><span>Termin</span><strong id="modalDeadline" style="color: #ef4444;">-</strong>
+                </div>
+                <div class="info-box"><span>Status</span><strong id="modalStatus">-</strong></div>
+            </div>
 
-				<h3 class="modal-parts-title">Części:</h3>
-				<div id="modalPartsList" class="modal-parts-container"></div>
+            <h3 class="modal-parts-title">Części:</h3>
+            <div id="modalPartsList" class="modal-parts-container"></div>
 
-				<div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
-					<a id="btnDownloadPdf" href="#" class="btn" style="background: #3b82f6; color: white; text-decoration: none; display: flex; align-items: center; gap: 5px;">Pobierz kartę PDF</a>
-					<button id="btnDeleteOrder" class="btn btn-danger-soft" style="display: none;" onclick="deleteOrder(currentOpenOrderId)">Usuń zlecenie</button>
-					<button id="btnEditOrder" class="btn" style="background: #fbbf24; color: #92400e; border-color: #fbbf24;" onclick="switchToEditMode()">Edytuj dane zlecenia</button>
-				</div>
-			</div>
+            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 10px; padding-top: 15px; border-top: 1px solid #e5e7eb;">
+                <a id="btnDownloadPdf" href="#" class="btn"
+                   style="background: #3b82f6; color: white; text-decoration: none; display: flex; align-items: center; gap: 5px;">Pobierz
+                    kartę PDF</a>
+                <button id="btnDeleteOrder" class="btn btn-danger-soft" style="display: none;"
+                        onclick="deleteOrder(currentOpenOrderId)">Usuń zlecenie
+                </button>
+                <button id="btnEditOrder" class="btn"
+                        style="background: #fbbf24; color: #92400e; border-color: #fbbf24;"
+                        onclick="switchToEditMode()">Edytuj dane zlecenia
+                </button>
+            </div>
+        </div>
 
-			<div id="modalEditContainer" style="display: none;">
-				<div class="modal-header">
-					<h2 style="margin: 0; color: #1f2937;">Edycja Zlecenia</h2>
-				</div>
-				<form id="editOrderForm">
-					<div class="info-grid">
-						<div class="info-box" style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); background: var(--card);">
-							<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">Numer Zlecenia</label>
-							<input type="text" id="editOrderNumber" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; margin-top: 6px; font-family: inherit; font-size: 14px; background: #f9fafb; font-weight: bold; color: #111827;">
-						</div>
-						<div class="info-box" style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); background: var(--card);">
-							<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">Nazwa Klienta</label>
-							<input type="text" id="editClient" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; margin-top: 6px; font-family: inherit; font-size: 14px; background: #f9fafb; color: #111827;">
-						</div>
-						<div class="info-box" style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); background: var(--card);">
-							<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">Operator Główny</label>
-							<select id="editOperator" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; margin-top: 6px; background: #f9fafb; font-family: inherit; font-size: 14px; color: #111827;">
-								<option value="">Nie przypisano</option>
-							</select>
-						</div>
-						<div class="info-box" style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); background: var(--card);">
-							<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">Termin (Deadline)</label>
-							<input type="date" id="editDeadline" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; margin-top: 6px; font-family: inherit; font-size: 14px; background: #fef2f2; color: #dc2626; font-weight: bold;">
-						</div>
-					</div>
+        <div id="modalEditContainer" style="display: none;">
+            <div class="modal-header">
+                <h2 style="margin: 0; color: #1f2937;">Edycja Zlecenia</h2>
+            </div>
+            <form id="editOrderForm">
+                <div class="info-grid">
+                    <div class="info-box"
+                         style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); background: var(--card);">
+                        <label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">Numer
+                            Zlecenia</label>
+                        <input type="text" id="editOrderNumber"
+                               style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; margin-top: 6px; font-family: inherit; font-size: 14px; background: #f9fafb; font-weight: bold; color: #111827;">
+                    </div>
+                    <div class="info-box"
+                         style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); background: var(--card);">
+                        <label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">Nazwa
+                            Klienta</label>
+                        <input type="text" id="editClient"
+                               style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; margin-top: 6px; font-family: inherit; font-size: 14px; background: #f9fafb; color: #111827;">
+                    </div>
+                    <div class="info-box"
+                         style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); background: var(--card);">
+                        <label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">Operator
+                            Główny</label>
+                        <select id="editOperator"
+                                style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; margin-top: 6px; background: #f9fafb; font-family: inherit; font-size: 14px; color: #111827;">
+                            <option value="">Nie przypisano</option>
+                        </select>
+                    </div>
+                    <div class="info-box"
+                         style="padding: 12px; border: 1px solid #e5e7eb; border-radius: 12px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06); background: var(--card);">
+                        <label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">Termin
+                            (Deadline)</label>
+                        <input type="date" id="editDeadline"
+                               style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; margin-top: 6px; font-family: inherit; font-size: 14px; background: #fef2f2; color: #dc2626; font-weight: bold;">
+                    </div>
+                </div>
 
-					<div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 15px;">
-						<h3 style="margin: 0; font-size: 16px;">Części i Kroki Technologiczne</h3>
-						<button type="button" class="btn" style="padding: 6px 12px; font-size: 13px;" onclick="addPartToEdit()">+ Dodaj część</button>
-					</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e5e7eb; padding-bottom: 10px; margin-bottom: 15px;">
+                    <h3 style="margin: 0; font-size: 16px;">Części i Kroki Technologiczne</h3>
+                    <button type="button" class="btn" style="padding: 6px 12px; font-size: 13px;"
+                            onclick="addPartToEdit()">+ Dodaj część
+                    </button>
+                </div>
 
-					<div id="editPartsContainer"></div>
+                <div id="editPartsContainer"></div>
 
-					<div style="text-align: right; border-top: 1px solid #e5e7eb; padding-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
-						<button type="button" class="btn" style="background: #f3f4f6; color: #4b5563;" onclick="openModal(currentOpenOrderId)">Anuluj</button>
-						<button id="saveOrderButton" type="button" class="btn btn-primary" onclick="saveOrderChanges()">Zapisz zmiany</button>
-					</div>
-				</form>
-			</div>
+                <div style="text-align: right; border-top: 1px solid #e5e7eb; padding-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" class="btn" style="background: #f3f4f6; color: #4b5563;"
+                            onclick="openModal(currentOpenOrderId)">Anuluj
+                    </button>
+                    <button id="saveOrderButton" type="button" class="btn btn-primary" onclick="saveOrderChanges()">
+                        Zapisz zmiany
+                    </button>
+                </div>
+            </form>
+        </div>
 
-		</div>
-	</div>
+    </div>
+</div>
 
-	<div id="archiveConfirmModal" class="modal-overlay" style="display:none; z-index: 1000;">
-		<div class="modal-box" style="max-width: 400px; text-align: center;">
-			<h3 style="margin-top: 0;">Zarchiwizuj zlecenie</h3>
-			<p style="color: #4b5563; margin-bottom: 20px;">Czy na pewno chcesz przenieść to zlecenie do archiwum?</p>
-			<div style="display: flex; justify-content: space-between; gap: 10px;">
-				<button class="btn" style="flex: 1; background: #f3f4f6; color: #4b5563;" onclick="document.getElementById('archiveConfirmModal').style.display='none'">Anuluj</button>
-				<button class="btn" style="flex: 1; background: #10b981; color: white; border: none;" id="confirmArchiveBtn">Tak, zarchiwizuj</button>
-			</div>
-		</div>
-	</div>
+<div id="archiveConfirmModal" class="modal-overlay" style="display:none; z-index: 1000;">
+    <div class="modal-box" style="max-width: 400px; text-align: center;">
+        <h3 style="margin-top: 0;">Zarchiwizuj zlecenie</h3>
+        <p style="color: #4b5563; margin-bottom: 20px;">Czy na pewno chcesz przenieść to zlecenie do archiwum?</p>
+        <div style="display: flex; justify-content: space-between; gap: 10px;">
+            <button class="btn" style="flex: 1; background: #f3f4f6; color: #4b5563;"
+                    onclick="document.getElementById('archiveConfirmModal').style.display='none'">Anuluj
+            </button>
+            <button class="btn" style="flex: 1; background: #10b981; color: white; border: none;"
+                    id="confirmArchiveBtn">Tak, zarchiwizuj
+            </button>
+        </div>
+    </div>
+</div>
 
-	<div id="operatorModal" class="modal-overlay" style="display:none;">
-		<div class="modal-box" style="max-width: 400px;">
-			<h3 style="margin-top: 0; margin-bottom: 20px; color: #1f2937;">Zarządzaj operatorami</h3>
+<div id="operatorModal" class="modal-overlay" style="display:none;">
+    <div class="modal-box" style="max-width: 400px;">
+        <h3 style="margin-top: 0; margin-bottom: 20px; color: #1f2937;">Zarządzaj operatorami</h3>
 
-			<div style="display: flex; gap: 8px; margin-bottom: 20px;">
-				<input type="text" id="newOpName" placeholder="Imię i nazwisko" style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
-				<button onclick="addOperator()" style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">Dodaj</button>
-			</div>
+        <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+            <input type="text" id="newOpName" placeholder="Imię i nazwisko"
+                   style="flex: 1; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+            <button onclick="addOperator()"
+                    style="background: #10b981; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold;">
+                Dodaj
+            </button>
+        </div>
 
-			<div id="opList" style="border-top: 1px solid #e5e7eb; pt: 10px;">
-				</div>
+        <div id="opList" style="border-top: 1px solid #e5e7eb; pt: 10px;">
+        </div>
 
-			<button class="btn" style="width: 100%; margin-top: 20px; background: #f3f4f6;" onclick="document.getElementById('operatorModal').style.display='none'">Zamknij</button>
-		</div>
-	</div>
+        <button class="btn" style="width: 100%; margin-top: 20px; background: #f3f4f6;"
+                onclick="document.getElementById('operatorModal').style.display='none'">Zamknij
+        </button>
+    </div>
+</div>
 
-	<script src="/frontend/js/api.js"></script>
+<script src="/frontend/js/api.js?v=manager-planning-1"></script>
+<script src="/frontend/js/material-plan.js?v=zuzycie-2"></script>
 <script>
-		async function checkAuth() {
-			const res = await fetch("/orders/");
-			if (res.status === 401 || res.status === 403) {
-				window.location.href = "/frontend/login.html";
-			}
-		}
-		checkAuth();
+    async function checkAuth() {
+        const res = await fetch("/orders/");
+        if (res.status === 401 || res.status === 403) {
+            window.location.href = "/frontend/login.html";
+        }
+    }
 
-		const STATUSES = ["IN_QUEUE", "IN_PROGRESS", "QUALITY_CHECK", "COMPLETED"];
-		const STATUS_NAMES = {
-			"IN_QUEUE": "Oczekujące",
-			"IN_PROGRESS": "W realizacji",
-			"QUALITY_CHECK": "Kontrola jakości",
-			"COMPLETED": "Zakończone"
-		};
-		const COLUMN_IDS = {
-			IN_QUEUE: "col-in-queue",
-			IN_PROGRESS: "col-in-progress",
-			QUALITY_CHECK: "col-quality-check",
-			COMPLETED: "col-completed"
-		};
+    checkAuth();
 
-		let orders = [];
-		let searchQuery = "";
-		let messageTimer = null;
-		let currentOpenOrderId = null;
-		let availableOperators = [];
-        WeldERP.request('/metadata/material-units').then(data => {
-            document.getElementById('materialUnits').innerHTML = data.units.map(unit => `<option value="${unit}"></option>`).join('');
-        }).catch(() => {});
+    const STATUSES = ["IN_QUEUE", "IN_PROGRESS", "QUALITY_CHECK", "COMPLETED"];
+    const STATUS_NAMES = {
+        "IN_QUEUE": "Oczekujące",
+        "IN_PROGRESS": "W realizacji",
+        "QUALITY_CHECK": "Kontrola jakości",
+        "COMPLETED": "Zakończone"
+    };
+    const COLUMN_IDS = {
+        IN_QUEUE: "col-in-queue",
+        IN_PROGRESS: "col-in-progress",
+        QUALITY_CHECK: "col-quality-check",
+        COMPLETED: "col-completed"
+    };
 
-		function operatorOptionsHtml() {
-			return availableOperators.map(op =>
-				`<option value="${escapeHtml(op.name)}">${escapeHtml(op.name)}</option>`
-			).join('');
-		}
+    let orders = [];
+    let searchQuery = "";
+    let messageTimer = null;
+    let currentOpenOrderId = null;
+    let availableOperators = [];
+    WeldERP.request('/metadata/material-units').then(data => {
+        document.getElementById('materialUnits').innerHTML = data.units.map(unit => `<option value="${unit}"></option>`).join('');
+    }).catch(() => {
+    });
 
-		function escapeHtml(value) {
-			return String(value ?? "")
-				.replace(/&/g, "&amp;")
-				.replace(/</g, "&lt;")
-				.replace(/>/g, "&gt;")
-				.replace(/"/g, "&quot;")
-				.replace(/'/g, "&#039;");
-		}
+    function operatorOptionsHtml() {
+        return availableOperators.map(op =>
+            `<option value="${escapeHtml(op.name)}">${escapeHtml(op.name)}</option>`
+        ).join('');
+    }
 
-		function formatDateTime(value) {
-			if (!value) return "Nie wykonano";
-			const date = new Date(value);
-			if (Number.isNaN(date.getTime())) return "Nie wykonano";
-			return date.toLocaleString("pl-PL", {
-				year: "numeric",
-				month: "2-digit",
-				day: "2-digit",
-				hour: "2-digit",
-				minute: "2-digit"
-			});
-		}
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
 
-		function showMessage(text, type = "info") {
-			const el = document.getElementById("message");
-			if (messageTimer) {
-				clearTimeout(messageTimer);
-			}
-			el.textContent = text;
-			el.className = `message ${type}`;
-			el.hidden = false;
-			messageTimer = setTimeout(() => {
-				el.hidden = true;
-				messageTimer = null;
-			}, 2200);
-		}
+    function formatDateTime(value) {
+        if (!value) return "Nie wykonano";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "Nie wykonano";
+        return date.toLocaleString("pl-PL", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+    }
 
-		function openModal(orderId) {
-			currentOpenOrderId = orderId;
-			const order = orders.find(o => o.id === orderId);
-			if (!order) return;
+    function showMessage(text, type = "info") {
+        const el = document.getElementById("message");
+        if (messageTimer) {
+            clearTimeout(messageTimer);
+        }
+        el.textContent = text;
+        el.className = `message ${type}`;
+        el.hidden = false;
+        messageTimer = setTimeout(() => {
+            el.hidden = true;
+            messageTimer = null;
+        }, 2200);
+    }
 
-			const STATUS_COLORS = {
-				"IN_QUEUE": "var(--queue)",
-				"IN_PROGRESS": "var(--progress)",
-				"QUALITY_CHECK": "var(--quality)",
-				"COMPLETED": "var(--done)"
-			};
+    function openModal(orderId) {
+        currentOpenOrderId = orderId;
+        const order = orders.find(o => o.id === orderId);
+        if (!order) return;
 
-			document.getElementById('modalOrderNumber').textContent = `Zlecenie: ${order.order_number}`;
-			document.getElementById('btnDownloadPdf').href = `/orders/${order.id}/pdf`;
-			document.getElementById('modalClient').textContent = order.client_name;
-			document.getElementById('modalOperator').textContent = order.operator || "Nie przypisano";
-			document.getElementById('modalDateReceived').textContent = order.date_received ? order.date_received.slice(0, 10) : "2026-05-18";
-			document.getElementById('modalDeadline').textContent = order.date_deadline ? order.date_deadline.slice(0, 10) : "Brak";
+        const STATUS_COLORS = {
+            "IN_QUEUE": "var(--queue)",
+            "IN_PROGRESS": "var(--progress)",
+            "QUALITY_CHECK": "var(--quality)",
+            "COMPLETED": "var(--done)"
+        };
 
-			const statusEl = document.getElementById('modalStatus');
-			statusEl.textContent = STATUS_NAMES[order.status] || order.status;
-			statusEl.style.color = STATUS_COLORS[order.status] || "#111827";
+        document.getElementById('modalOrderNumber').textContent = `Zlecenie: ${order.order_number}`;
+        document.getElementById('btnDownloadPdf').href = `/orders/${order.id}/pdf`;
+        document.getElementById('modalClient').textContent = order.client_name;
+        document.getElementById('modalOperator').textContent = order.operator || "Nie przypisano";
+        document.getElementById('modalDateReceived').textContent = order.date_received ? order.date_received.slice(0, 10) : "2026-05-18";
+        document.getElementById('modalDeadline').textContent = order.date_deadline ? order.date_deadline.slice(0, 10) : "Brak";
 
-			const btnEdit = document.getElementById('btnEditOrder');
-			btnEdit.style.display = (order.status === 'COMPLETED' || order.status === 'ARCHIVED') ? 'none' : 'inline-block';
-			const btnDeleteOrder = document.getElementById('btnDeleteOrder');
-			btnDeleteOrder.style.display = order.status === 'IN_QUEUE' ? 'inline-block' : 'none';
+        const statusEl = document.getElementById('modalStatus');
+        statusEl.textContent = STATUS_NAMES[order.status] || order.status;
+        statusEl.style.color = STATUS_COLORS[order.status] || "#111827";
 
-			const readOnly = order.status === 'COMPLETED' || order.status === 'ARCHIVED';
-			const canRecordProduction = order.status === 'IN_PROGRESS' && !(order.parts || []).some(part => part.material_missing);
-			let productionHint = '';
-			if (order.status === 'QUALITY_CHECK') {
-				productionHint = 'Odznaczenie wykonanej operacji cofnie zlecenie do realizacji i wycofa zatwierdzenie jakości.';
-			} else if (order.status === 'IN_QUEUE') {
-				productionHint = 'Możesz cofnąć oznaczenie wykonania. Nowe wykonanie zapiszesz po przeniesieniu zlecenia do realizacji.';
-			} else if (readOnly) {
-				productionHint = 'Zlecenie jest zakończone. Rejestr produkcji jest dostępny tylko do odczytu.';
-			}
-			let partsHtml = productionHint ? `<p class="production-hint" style="font-size:13px; color:#4b5563;">${productionHint}</p>` : '';
-			partsHtml += `<ol class="modal-parts-list" style="padding-left: 20px; list-style-type: decimal;">`;
+        const btnEdit = document.getElementById('btnEditOrder');
+        btnEdit.style.display = (order.status === 'COMPLETED' || order.status === 'ARCHIVED') ? 'none' : 'inline-block';
+        const btnDeleteOrder = document.getElementById('btnDeleteOrder');
+        btnDeleteOrder.style.display = order.status === 'IN_QUEUE' ? 'inline-block' : 'none';
 
-			if (order.parts && order.parts.length > 0) {
-				order.parts.forEach(part => {
-					const pdfsHtml = (part.pdfs && part.pdfs.length > 0)
-						? part.pdfs.map(pdf => `<a href="${escapeHtml(pdf.url || ('/uploads/' + encodeURIComponent(pdf.file_name)))}" target="_blank" class="pdf-badge" style="margin-left:5px;">PDF</a>`).join('')
-						: '';
-					const materialText = part.material ? part.material : 'Brak wpisanego materiału';
-					const materialButtonText = part.material_missing ? 'Materiał uzupełniony' : 'Brak materiału';
-					const materialButtonClass = part.material_missing ? 'material-ok-btn' : 'material-missing-btn';
-					const missingBadge = part.material_missing ? `<span class="material-missing-label">Brak materiału</span>` : '';
-					const canChangeMaterialStatus = order.status !== 'COMPLETED' && order.status !== 'ARCHIVED';
-					const materialActionHtml = canChangeMaterialStatus
-						? `<button type="button" class="part-material-btn ${materialButtonClass}" onclick="togglePartMaterialMissing(${part.id}, ${!part.material_missing})">${materialButtonText}</button>`
-						: '';
+        const readOnly = order.status === 'COMPLETED' || order.status === 'ARCHIVED';
+        const canRecordProduction = order.status === 'IN_PROGRESS' && order.materials_ready;
+        let productionHint = '';
+        if (order.status === 'QUALITY_CHECK') {
+            productionHint = 'Odznaczenie wykonanej operacji cofnie zlecenie do realizacji i wycofa zatwierdzenie jakości.';
+        } else if (order.status === 'IN_QUEUE') {
+            productionHint = 'Możesz cofnąć oznaczenie wykonania. Nowe wykonanie zapiszesz po przeniesieniu zlecenia do realizacji.';
+        } else if (order.status === 'IN_PROGRESS') {
+            productionHint = 'Przed przekazaniem do kontroli jakości wykonaj wszystkie operacje i zapisz rzeczywiste zużycie materiału przy każdej części. Zużycie musi być większe od zera i rozliczone z magazynem.';
+        } else if (readOnly) {
+            productionHint = 'Zlecenie jest zakończone. Rejestr produkcji jest dostępny tylko do odczytu.';
+        }
+        let partsHtml = order.materials_ready ? '' : '<p class="material-shortage">Zlecenie czeka na uzupełnienie materiałów. Szczegóły braków podano przy częściach.</p>';
+        partsHtml += productionHint ? `<p class="production-hint" style="font-size:13px; color:#4b5563;">${productionHint}</p>` : '';
+        partsHtml += `<ol class="modal-parts-list" style="padding-left: 20px; list-style-type: decimal;">`;
 
-					partsHtml += `
+        if (order.parts && order.parts.length > 0) {
+            order.parts.forEach(part => {
+                const pdfsHtml = (part.pdfs && part.pdfs.length > 0)
+                    ? part.pdfs.map(pdf => `<a href="${escapeHtml(pdf.url || ('/uploads/' + encodeURIComponent(pdf.file_name)))}" target="_blank" class="pdf-badge" style="margin-left:5px;">PDF</a>`).join('')
+                    : '';
+                const materialText = part.material ? part.material : 'Brak wpisanego materiału';
+                const materialButtonText = part.material_missing ? 'Materiał uzupełniony' : 'Brak materiału';
+                const materialButtonClass = part.material_missing ? 'material-ok-btn' : 'material-missing-btn';
+                const missingBadge = part.material_missing ? `<span class="material-missing-label">Brak materiału</span>` : '';
+                const canChangeMaterialStatus = order.status !== 'COMPLETED' && order.status !== 'ARCHIVED' && (!part.warehouse_material_id || part.material_missing);
+                const materialActionHtml = canChangeMaterialStatus
+                    ? `<button type="button" class="part-material-btn ${materialButtonClass}" onclick="togglePartMaterialMissing(${part.id}, ${!part.material_missing})">${materialButtonText}</button>`
+                    : '';
+
+                partsHtml += `
 						<li style="margin-bottom: 15px;">
 							<div class="part-detail-row">
 								<span class="part-name-text" style="font-weight: 600;">${escapeHtml(part.part_name)}</span>
@@ -304,24 +352,26 @@
 								${materialActionHtml}
 							</div>
 
-                            <div class="part-material-usage" data-part-id="${part.id}">
-                                <div class="production-record-head"><strong>Zużycie materiału części</strong></div>
-                                <div class="production-material-info">Materiał części: <strong>${escapeHtml(part.material || 'Brak wpisanego materiału')}</strong></div>
+                            ${MaterialPlan.describe(part, order.status)}
+                            <div class="part-material-usage" data-part-id="${part.id}" data-usage-version="${part.material_usage_version}">
+                                <div class="production-record-head"><strong>Zużycie materiału</strong></div>
+                                <div class="production-material-info">Materiał: <strong>${escapeHtml(part.material || 'Brak wpisanego materiału')}</strong></div>
+                                <p class="production-hint">${readOnly ? 'Zapisane zużycie tej części.' : 'Wpisz łączną zużytą ilość. Zapis automatycznie odejmie materiał z magazynu i zwolni wykorzystaną rezerwację. Poprawienie ilości rozliczy tylko różnicę.'}</p>
                                 <div class="production-grid">
                                     <label>Zużyta ilość
                                         <input type="text" inputmode="decimal" class="part-material-quantity" value="${escapeHtml(part.material_quantity ?? '')}" placeholder="np. 1,25" ${canRecordProduction ? '' : 'disabled'}>
                                     </label>
                                     <label>Jedn.
-                                        <input type="text" class="part-material-unit" list="materialUnits" value="${escapeHtml(part.material_unit || '')}" placeholder="kg / szt." ${canRecordProduction ? '' : 'disabled'}>
+                                        <input type="text" class="part-material-unit" value="${escapeHtml(canRecordProduction ? part.planned_unit || part.material_unit || '' : part.material_unit || part.planned_unit || '')}" readonly>
                                     </label>
                                 </div>
                                 ${canRecordProduction ? `<button type="button" class="btn production-save-btn" onclick="savePartMaterialUsage(${part.id}, this.closest('.part-material-usage'))">Zapisz zużycie</button>` : ''}
                             </div>
 							<ol class="modal-steps-list" style="margin-top: 5px; padding-left: 30px;">
 									${part.steps.map(step => {
-                                const checked = step.is_completed ? 'checked' : '';
-                                const disabled = canRecordProduction || (step.is_completed && !readOnly) ? '' : 'disabled';
-                                return `
+                    const checked = step.is_completed ? 'checked' : '';
+                    const disabled = canRecordProduction || (step.is_completed && !readOnly) ? '' : 'disabled';
+                    return `
                                     <div class="step-item" data-step-id="${step.id}">
                                         <label class="step-check-row">
                                             <input type="checkbox" class="step-complete-checkbox" ${checked} ${disabled} onchange="saveStepCompletion(${step.id}, this)">
@@ -330,72 +380,73 @@
                                         </label>
                                         <span class="step-completed-at">${escapeHtml(formatDateTime(step.completed_at))}</span>
                                     </div>`;
-                            }).join('')}
+                }).join('')}
 							</ol>
 						</li>`;
-				});
-			} else {
-				partsHtml += "<p style='color: #6b7280; font-style: italic;'>Brak części w tym zleceniu.</p>";
-			}
+            });
+        } else {
+            partsHtml += "<p style='color: #6b7280; font-style: italic;'>Brak części w tym zleceniu.</p>";
+        }
 
-			partsHtml += `</ol>`;
-			document.getElementById('modalPartsList').innerHTML = partsHtml;
+        partsHtml += `</ol>`;
+        document.getElementById('modalPartsList').innerHTML = partsHtml;
 
-			document.getElementById('modalViewContainer').style.display = 'block';
-			document.getElementById('modalEditContainer').style.display = 'none';
-			document.getElementById('orderModal').style.display = "block";
-		}
+        document.getElementById('modalViewContainer').style.display = 'block';
+        document.getElementById('modalEditContainer').style.display = 'none';
+        document.getElementById('orderModal').style.display = "block";
+    }
 
-		async function switchToEditMode() {
-    		const order = orders.find(o => o.id === currentOpenOrderId);
-    		if (!order) return;
-			await refreshOperatorDropdowns();
+    async function switchToEditMode() {
+        await MaterialPlan.initialize();
+        const order = orders.find(o => o.id === currentOpenOrderId);
+        if (!order) return;
+        await refreshOperatorDropdowns();
 
-    		document.getElementById('modalViewContainer').style.display = 'none';
-    		document.getElementById('modalEditContainer').style.display = 'block';
+        document.getElementById('modalViewContainer').style.display = 'none';
+        document.getElementById('modalEditContainer').style.display = 'block';
 
-    		document.getElementById('editOrderNumber').value = order.order_number;
-    		document.getElementById('editClient').value = order.client_name;
-    		document.getElementById('editOperator').value = order.operator || "";
+        document.getElementById('editOrderNumber').value = order.order_number;
+        document.getElementById('editClient').value = order.client_name;
+        document.getElementById('editOperator').value = order.operator || "";
 
-    		document.getElementById('editDeadline').value = order.date_deadline ? order.date_deadline.slice(0, 10) : "";
+        document.getElementById('editDeadline').value = order.date_deadline ? order.date_deadline.slice(0, 10) : "";
 
-    		const partsContainer = document.getElementById('editPartsContainer');
-    		partsContainer.innerHTML = "";
+        const partsContainer = document.getElementById('editPartsContainer');
+        partsContainer.innerHTML = "";
 
-    		if (order.parts && order.parts.length > 0) {
-        		order.parts.forEach(part => {
-            	addPartToEdit(part);
-        		});
-    		}
-		}
+        if (order.parts && order.parts.length > 0) {
+            order.parts.forEach(part => {
+                addPartToEdit(part);
+            });
+        }
+    }
 
-		function addPartToEdit(part = {}) {
-			const container = document.getElementById('editPartsContainer');
-			const partEl = document.createElement('div');
-			partEl.className = 'edit-part-item';
-            partEl.dataset.partId = part.id || '';
-            partEl.dataset.clientKey = WeldERP.clientKey();
-            partEl.pendingFiles = [];
-            partEl.removedPdfIds = new Set();
-			partEl.style.border = '1px solid #e5e7eb';
-			partEl.style.padding = '14px';
-			partEl.style.marginBottom = '12px';
-			partEl.style.borderRadius = '12px';
-			partEl.style.background = '#ffffff';
-			partEl.style.boxShadow = '0 1px 2px rgba(16, 24, 40, 0.06)';
+    function addPartToEdit(part = {}) {
+        const container = document.getElementById('editPartsContainer');
+        const partEl = document.createElement('div');
+        partEl.className = 'edit-part-item';
+        partEl.dataset.partId = part.id || '';
+        partEl.dataset.clientKey = WeldERP.clientKey();
+        partEl.pendingFiles = [];
+        partEl.removedPdfIds = new Set();
+        partEl.style.border = '1px solid #e5e7eb';
+        partEl.style.padding = '14px';
+        partEl.style.marginBottom = '12px';
+        partEl.style.borderRadius = '12px';
+        partEl.style.background = '#ffffff';
+        partEl.style.boxShadow = '0 1px 2px rgba(16, 24, 40, 0.06)';
 
-			let pdfsHtml = "";
-			if (part.pdfs && part.pdfs.length > 0) {
-				pdfsHtml = part.pdfs.map(pdf => `
+        let pdfsHtml = "";
+        if (part.pdfs && part.pdfs.length > 0) {
+            pdfsHtml = part.pdfs.map(pdf => `
 					<div style="background: #fef2f2; padding: 4px 8px; border-radius: 4px; display: inline-flex; align-items: center; gap: 5px; margin: 2px; font-size: 12px; border: 1px solid #fecaca;">
 						<span style="color: #991b1b;">${escapeHtml(pdf.file_name)}</span>
 						<button type="button" onclick="deletePdf(${pdf.id}, this)" style="border:none; background:none; color:#ef4444; font-weight:bold; cursor:pointer;">x</button>
 					</div>
 				`).join('');
-			}
+        }
 
-			partEl.innerHTML = `
+        partEl.innerHTML = `
 			   <div style="display: grid; grid-template-columns: minmax(180px, 2fr) minmax(150px, 1fr) auto; gap: 10px; margin-bottom: 15px; align-items: end;">
 				  <label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">
 					 Nazwa części
@@ -433,53 +484,55 @@
 			   <button type="button" class="add-step-btn btn" style="margin-top: 10px; margin-left: 20px; font-size: 12px; padding: 6px 10px; cursor: pointer; background: #f3f4f6; color: #4b5563; border: 1px solid #d1d5db;">+ Dodaj krok</button>
 			`;
 
-			partEl.querySelector('.edit-part-operator').value = part.operator || "";
+        partEl.querySelector('.edit-part-operator').value = part.operator || "";
+        partEl.querySelector('.edit-part-material').parentElement.style.display = 'none';
+        partEl.querySelector('.edit-part-material').parentElement.insertAdjacentElement('afterend', MaterialPlan.create(part));
 
-			partEl.querySelector('.remove-part-btn').addEventListener('click', () => {
-			   container.removeChild(partEl);
-			});
+        partEl.querySelector('.remove-part-btn').addEventListener('click', () => {
+            container.removeChild(partEl);
+        });
 
-			const stepsContainer = partEl.querySelector('.edit-steps-container');
-			partEl.querySelector('.add-step-btn').addEventListener('click', () => {
-			   addStepToEditUI(stepsContainer, {});
-			});
+        const stepsContainer = partEl.querySelector('.edit-steps-container');
+        partEl.querySelector('.add-step-btn').addEventListener('click', () => {
+            addStepToEditUI(stepsContainer, {});
+        });
 
-			if (part.steps && part.steps.length > 0) {
-			   part.steps.forEach(step => {
-				  addStepToEditUI(stepsContainer, step);
-			   });
-			}
+        if (part.steps && part.steps.length > 0) {
+            part.steps.forEach(step => {
+                addStepToEditUI(stepsContainer, step);
+            });
+        }
 
-			container.appendChild(partEl);
-		}
+        container.appendChild(partEl);
+    }
 
-	function refreshEditStepNumbers(container) {
-		container.querySelectorAll('.edit-step-item').forEach((stepEl, index) => {
-			const numberEl = stepEl.querySelector('.edit-step-number');
-			if (numberEl) {
-				numberEl.textContent = `Krok ${index + 1}`;
-			}
-		});
-	}
+    function refreshEditStepNumbers(container) {
+        container.querySelectorAll('.edit-step-item').forEach((stepEl, index) => {
+            const numberEl = stepEl.querySelector('.edit-step-number');
+            if (numberEl) {
+                numberEl.textContent = `Krok ${index + 1}`;
+            }
+        });
+    }
 
-	function addStepToEditUI(container, step = {}) {
-		const stepEl = document.createElement('div');
-		stepEl.className = 'edit-step-item';
+    function addStepToEditUI(container, step = {}) {
+        const stepEl = document.createElement('div');
+        stepEl.className = 'edit-step-item';
         stepEl.dataset.stepId = step.id || '';
-		stepEl.dataset.isCompleted = step.is_completed ? "true" : "false";
-		stepEl.dataset.completedBy = step.completed_by || "";
-		stepEl.dataset.completedAt = step.completed_at || "";
-		stepEl.dataset.productionNotes = step.production_notes || "";
-		stepEl.dataset.materialUsed = step.material_used || "";
-		stepEl.dataset.materialQuantity = step.material_quantity ?? "";
-		stepEl.dataset.materialUnit = step.material_unit || "";
-		stepEl.style.display = 'grid';
-		stepEl.style.gridTemplateColumns = '72px minmax(160px, 2fr) minmax(140px, 1fr) auto';
-		stepEl.style.gap = '8px';
-		stepEl.style.marginBottom = '8px';
-		stepEl.style.alignItems = 'end';
+        stepEl.dataset.isCompleted = step.is_completed ? "true" : "false";
+        stepEl.dataset.completedBy = step.completed_by || "";
+        stepEl.dataset.completedAt = step.completed_at || "";
+        stepEl.dataset.productionNotes = step.production_notes || "";
+        stepEl.dataset.materialUsed = step.material_used || "";
+        stepEl.dataset.materialQuantity = step.material_quantity ?? "";
+        stepEl.dataset.materialUnit = step.material_unit || "";
+        stepEl.style.display = 'grid';
+        stepEl.style.gridTemplateColumns = '72px minmax(160px, 2fr) minmax(140px, 1fr) auto';
+        stepEl.style.gap = '8px';
+        stepEl.style.marginBottom = '8px';
+        stepEl.style.alignItems = 'end';
 
-		stepEl.innerHTML = `
+        stepEl.innerHTML = `
 			<span class="edit-step-number" style="font-size: 12px; font-weight: bold; color: #374151; padding-bottom: 8px;">Krok</span>
 			<label style="font-size: 11px; font-weight: bold; color: #6b7280; text-transform: uppercase;">
 				Nazwa kroku
@@ -495,18 +548,18 @@
 			<button type="button" class="remove-step-btn" title="Usuń krok" style="color: #ef4444; border: none; background: #fee2e2; border-radius: 6px; padding: 6px 10px; font-weight: bold; cursor: pointer; transition: 0.2s;">X</button>
 		`;
 
-		stepEl.querySelector('.edit-step-operator').value = step.operator || "";
+        stepEl.querySelector('.edit-step-operator').value = step.operator || "";
 
-		stepEl.querySelector('.remove-step-btn').addEventListener('click', () => {
-			container.removeChild(stepEl);
-			refreshEditStepNumbers(container);
-		});
+        stepEl.querySelector('.remove-step-btn').addEventListener('click', () => {
+            container.removeChild(stepEl);
+            refreshEditStepNumbers(container);
+        });
 
-		container.appendChild(stepEl);
-		refreshEditStepNumbers(container);
-	}
+        container.appendChild(stepEl);
+        refreshEditStepNumbers(container);
+    }
 
-	async function saveOrderChanges() {
+    async function saveOrderChanges() {
         if (!currentOpenOrderId) return;
         const saveButton = document.getElementById('saveOrderButton');
         if (saveButton.disabled) return;
@@ -524,16 +577,21 @@
                 if (!partName) throw new Error('Uzupełnij nazwę każdej części');
                 const rows = [...block.querySelectorAll('.edit-step-item')];
                 if (!rows.length) throw new Error('Część musi zawierać co najmniej jedną operację');
-                return {id: block.dataset.partId ? Number(block.dataset.partId) : null,
+                return {
+                    id: block.dataset.partId ? Number(block.dataset.partId) : null,
                     client_key: block.dataset.clientKey, part_name: partName,
                     material: block.querySelector('.edit-part-material').value.trim() || null,
                     operator: block.querySelector('.edit-part-operator').value || null,
+                    ...MaterialPlan.payload(block),
                     steps: rows.map(row => {
                         const name = row.querySelector('.edit-step-name').value.trim();
                         if (!name) throw new Error('Uzupełnij nazwę każdej operacji');
-                        return {id: row.dataset.stepId ? Number(row.dataset.stepId) : null,
-                            step_name: name, operator: row.querySelector('.edit-step-operator').value || null};
-                    })};
+                        return {
+                            id: row.dataset.stepId ? Number(row.dataset.stepId) : null,
+                            step_name: name, operator: row.querySelector('.edit-step-operator').value || null
+                        };
+                    })
+                };
             });
             for (const block of blocks) {
                 for (const item of block.pendingFiles) if (!item.uploaded) await WeldERP.validatePDF(item.file);
@@ -566,7 +624,7 @@
             }
             closeModal();
             await loadOrders();
-            showMessage('Zlecenie i załączniki zapisane', 'success');
+            showMessage(result.material_warnings?.length ? 'Zlecenie zapisane. ' + result.material_warnings.join(' ') : 'Zlecenie zapisane. Materiał zarezerwowany.', result.material_warnings?.length ? 'error' : 'success');
         } catch (error) {
             showMessage((savedStructure ? 'Dane zlecenia zapisane. Ponów zapis pozostałych załączników: ' : '') + error.message, 'error');
         } finally {
@@ -574,85 +632,146 @@
         }
     }
 
-		function closeModal() {
-			document.getElementById('orderModal').style.display = "none";
-		}
+    function closeModal() {
+        document.getElementById('orderModal').style.display = "none";
+    }
 
-		window.onclick = function(event) {
-			const modal = document.getElementById('orderModal');
-			if (event.target == modal) {
-				modal.style.display = "none";
-			}
-		}
+    window.onclick = function (event) {
+        const modal = document.getElementById('orderModal');
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
+    }
 
-		function createCard(order) {
-			const card = document.createElement("div");
-			card.className = "order-card";
-			card.draggable = true;
-			card.dataset.orderId = String(order.id);
-			card.dataset.status = order.status;
-			const hasMissingMaterial = order.parts && order.parts.some(part => part.material_missing);
-			const needsCorrection = order.needs_correction && order.status !== 'COMPLETED' && order.status !== 'ARCHIVED';
+    function getUrgency(order) {
+        if (
+            !order.date_deadline ||
+            order.status === "COMPLETED" ||
+            order.status === "ARCHIVED"
+        ) {
+            return null;
+        }
 
-			if (order.is_approved && order.status !== 'COMPLETED' && order.status !== 'ARCHIVED') {
-				card.style.border = '2px solid #10b981';
-				card.style.boxShadow = '0 0 12px rgba(16, 185, 129, 0.4)';
-				card.style.backgroundColor = '#ecfdf5';
-			} else if (order.date_deadline) {
-				const deadlineDate = new Date(order.date_deadline);
-				const now = new Date();
-				now.setHours(0, 0, 0, 0); // Zignoruj godziny, żeby liczyć same dni
-				const diffDays = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
+        const deadline = new Date(order.date_deadline.slice(0, 10) + "T00:00:00");
 
-				if (order.status !== 'COMPLETED' && order.status !== 'ARCHIVED') {
-					if (diffDays < 0) {
-						card.style.border = '2px solid #dc2626';
-						card.style.boxShadow = '0 0 12px rgba(220, 38, 38, 0.7)';
-						card.style.backgroundColor = '#fef2f2';
-					} else if (diffDays <= 2) {
-						card.classList.add('close-deadline');
-					}
-				}
-			}
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
 
-			if (hasMissingMaterial) {
-				card.classList.add('material-missing-card');
-				card.style.border = '2px solid #f97316';
-				card.style.boxShadow = '0 0 12px rgba(249, 115, 22, 0.35)';
-				card.style.backgroundColor = '#fff7ed';
-			}
+        const diffDays = Math.round(
+            (deadline - today) / (1000 * 60 * 60 * 24)
+        );
 
-			if (needsCorrection) {
-				card.classList.add('needs-correction-card');
-				card.style.border = '2px solid #dc2626';
-				card.style.boxShadow = '0 0 14px rgba(220, 38, 38, 0.42)';
-				card.style.backgroundColor = '#fef2f2';
-			}
+        if (diffDays < 0) {
+            return "Termin przekroczony";
+        }
 
-			card.onclick = (e) => {
-				if (!e.target.closest('button')) {
-					openModal(order.id);
-				}
-			};
+        if (diffDays <= 2) {
+            return "Pilne";
+        }
 
-            const deadlineStr = order.date_deadline ? order.date_deadline.slice(0, 10) : "Brak terminu";
-			const missingMaterialHtml = hasMissingMaterial ? `<p class="card-alert">Brak materiału</p>` : '';
-			const needsCorrectionHtml = needsCorrection ? `<p class="card-alert correction-alert">Do poprawy - priorytet</p>` : '';
+        return null;
+    }
 
-			let qualityActionsHtml = '';
-			if (order.status === "QUALITY_CHECK") {
-				qualityActionsHtml = `
+    function createCard(order) {
+        const card = document.createElement("div");
+        card.className = "order-card";
+        card.style.position = "relative";
+        card.draggable = true;
+        card.dataset.orderId = String(order.id);
+        card.dataset.status = order.status;
+        const hasMissingMaterial = !order.materials_ready;
+        const needsCorrection = order.needs_correction && order.status !== 'COMPLETED' && order.status !== 'ARCHIVED';
+
+        if (order.is_approved && order.status !== 'COMPLETED' && order.status !== 'ARCHIVED') {
+            card.style.border = '2px solid #10b981';
+            card.style.boxShadow = '0 0 12px rgba(16, 185, 129, 0.4)';
+            card.style.backgroundColor = '#ecfdf5';
+        } else if (order.date_deadline) {
+            const deadlineDate = new Date(order.date_deadline);
+            const now = new Date();
+            now.setHours(0, 0, 0, 0); // Zignoruj godziny, żeby liczyć same dni
+            const diffDays = Math.ceil((deadlineDate - now) / (1000 * 60 * 60 * 24));
+
+            if (order.status !== 'COMPLETED' && order.status !== 'ARCHIVED') {
+                if (diffDays < 0) {
+                    card.style.border = '2px solid #dc2626';
+                    card.style.boxShadow = '0 0 12px rgba(220, 38, 38, 0.7)';
+                    card.style.backgroundColor = '#fef2f2';
+                } else if (diffDays <= 2) {
+                    card.classList.add('close-deadline');
+                }
+            }
+        }
+
+        if (hasMissingMaterial) {
+            card.classList.add('material-missing-card');
+            card.style.border = '2px solid #f97316';
+            card.style.boxShadow = '0 0 12px rgba(249, 115, 22, 0.35)';
+            card.style.backgroundColor = '#fff7ed';
+        }
+
+        if (needsCorrection) {
+            card.classList.add('needs-correction-card');
+            card.style.border = '2px solid #dc2626';
+            card.style.boxShadow = '0 0 14px rgba(220, 38, 38, 0.42)';
+            card.style.backgroundColor = '#fef2f2';
+        }
+
+        card.onclick = (e) => {
+            if (!e.target.closest('button')) {
+                openModal(order.id);
+            }
+        };
+
+        const deadlineStr = order.date_deadline
+            ? order.date_deadline.slice(0, 10)
+            : "Brak terminu";
+
+        const urgency = getUrgency(order);
+
+        const urgencyHtml = urgency
+            ? `<span title="${escapeHtml(urgency)}" style="
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: #fee2e2;
+        color: #b91c1c;
+        border: 1px solid #fecaca;
+        border-radius: 20px;
+        padding: 4px 9px;
+        font-size: 11px;
+        font-weight: 700;
+        z-index: 2;
+        white-space: nowrap;
+    ">🚨 Pilne</span>`
+            : "";
+
+        const missingMaterialHtml = hasMissingMaterial
+            ? `<p class="card-alert">Brak materiału — uzupełnij magazyn</p>`
+            : "";
+
+        const needsCorrectionHtml = needsCorrection
+            ? `<p class="card-alert correction-alert">Do poprawy - priorytet</p>`
+            : "";
+        let qualityActionsHtml = '';
+        if (order.status === "QUALITY_CHECK") {
+            qualityActionsHtml = `
 					${!order.is_approved ? `<button class="btn btn-success-card" onclick="approveOrder(event, ${order.id})">Zatwierdź jakość</button>` : ""}
 					${!order.is_approved ? `<button class="btn btn-correction-card" onclick="markNeedsCorrection(${order.id}, event)">Do poprawy</button>` : ""}
 				`;
-			}
+        }
 
-			card.innerHTML = `
-				<div class="card-header">
-					<p class="order-number"><strong>${escapeHtml(order.order_number)}</strong></p>
-				</div>
-                <p class="order-deadline">${deadlineStr}</p>
-				${missingMaterialHtml}
+        card.innerHTML = `
+                ${urgencyHtml}
+
+                    <div class="card-header" style="padding-right: 65px;">
+                        <p class="order-number">
+                            <strong>${escapeHtml(order.order_number)}</strong>
+                        </p>
+                    </div>
+
+                    <p class="order-deadline">${escapeHtml(deadlineStr)}</p>
+                ${missingMaterialHtml}
 				${needsCorrectionHtml}
 				${qualityActionsHtml}
                  ${order.status === "COMPLETED" ? `
@@ -663,285 +782,302 @@
     			` : ""}
 			`;
 
-			card.addEventListener("dragstart", (event) => {
-				event.dataTransfer.setData("text/plain", String(order.id));
-				event.dataTransfer.effectAllowed = "move";
-				card.classList.add("dragging");
-			});
+        card.addEventListener("dragstart", (event) => {
+            event.dataTransfer.setData("text/plain", String(order.id));
+            event.dataTransfer.effectAllowed = "move";
+            card.classList.add("dragging");
+        });
 
-			card.addEventListener("dragend", () => {
-				card.classList.remove("dragging");
-			});
+        card.addEventListener("dragend", () => {
+            card.classList.remove("dragging");
+        });
 
-			return card;
-		}
-
-		function matchesSearch(order) {
-			if (!searchQuery) {
-				return true;
-			}
-
-			const searchableText = [
-				order.order_number,
-				order.client_name,
-				order.project_name || ""
-			]
-				.join(" ")
-				.toLowerCase();
-
-			return searchableText.includes(searchQuery);
-		}
-
-		function renderBoard() {
-			const visibleOrders = orders
-            .filter(o => o.status !== "ARCHIVED")
-            .filter(matchesSearch);
-			const hasSearch = Boolean(searchQuery);
-
-			STATUSES.forEach((status) => {
-				const container = document.getElementById(COLUMN_IDS[status]);
-				const count = document.getElementById(`count-${status}`);
-				const items = visibleOrders.filter((o) => o.status === status);
-
-				container.innerHTML = "";
-				count.textContent = String(items.length);
-
-				if (!items.length) {
-					const empty = document.createElement("p");
-					empty.className = "empty-state";
-					empty.textContent = hasSearch ? "Brak wyników" : "Brak zleceń";
-					container.appendChild(empty);
-					return;
-				}
-
-				items.forEach((order) => {
-					container.appendChild(createCard(order));
-				});
-			});
-		}
-
-		async function loadOrders() {
-			const res = await fetch("/orders/");
-			if (!res.ok) {
-				showMessage("Błąd pobierania zleceń", "error");
-				return;
-			}
-
-			orders = await res.json();
-			renderBoard();
-		}
-
-		async function moveOrder(orderId, targetStatus) {
-			const current = orders.find((o) => o.id === orderId);
-			if (!current || current.status === targetStatus) {
-				return;
-			}
-
-			if (current.status === 'COMPLETED') {
-				showMessage("Zakończonych zleceń nie można przenosić!", "error");
-				return;
-			}
-
-			if (targetStatus === 'COMPLETED' && !current.is_approved) {
-				showMessage("Wymagane jest zatwierdzenie jakości przed zakończeniem!", "error");
-				return;
-			}
-
-			if (targetStatus !== 'IN_QUEUE' && current.parts && current.parts.some(part => part.material_missing)) {
-				showMessage("Najpierw odkliknij brak materiału przy części.", "error");
-				return;
-			}
-
-			const previousStatus = current.status;
-			current.status = targetStatus;
-			renderBoard();
-
-			const res = await fetch(`/orders/${orderId}/status?status=${targetStatus}`, {
-				method: "PUT"
-			});
-
-			if (!res.ok) {
-				current.status = previousStatus;
-				renderBoard();
-				showMessage("Nie udało się zmienić statusu", "error");
-				return;
-			}
-
-			showMessage("Status zaktualizowany", "success");
-		}
-
-		function setupDropZones() {
-			document.querySelectorAll(".cards").forEach((zone) => {
-				zone.addEventListener("dragover", (event) => {
-					event.preventDefault();
-					event.dataTransfer.dropEffect = "move";
-					zone.classList.add("drop-active");
-				});
-
-				zone.addEventListener("dragleave", () => {
-					zone.classList.remove("drop-active");
-				});
-
-				zone.addEventListener("drop", async (event) => {
-					event.preventDefault();
-					zone.classList.remove("drop-active");
-
-					const droppedId = Number(event.dataTransfer.getData("text/plain"));
-					const targetStatus = zone.dataset.status;
-					if (!droppedId || !targetStatus) {
-						return;
-					}
-
-					await moveOrder(droppedId, targetStatus);
-				});
-			});
-		}
-
-		document.getElementById("refreshBtn").addEventListener("click", () => {
-			loadOrders();
-		});
-
-		document.getElementById("newOrderBtn").addEventListener("click", () => {
-			window.location.href = "/index.html";
-		});
-
-		document.getElementById("searchInput").addEventListener("input", (event) => {
-			searchQuery = event.target.value.trim().toLowerCase();
-			renderBoard();
-		});
-
-		setupDropZones();
-		loadOrders();
-
-		async function downloadAIReport() {
-			showMessage("AI generuje raport PDF...", "info");
-
-			try {
-				const response = await fetch("/reports/ai-pdf"); // Endpoint w main.py
-
-				if (!response.ok) throw new Error("Błąd generowania raportu");
-
-				const blob = await response.blob();
-				const url = window.URL.createObjectURL(blob);
-				const a = document.createElement('a');
-
-				a.href = url;
-				a.download = `Raport_Produkcyjny_AI_${new Date().toISOString().slice(0,10)}.pdf`;
-				document.body.appendChild(a);
-				a.click();
-				window.URL.revokeObjectURL(url);
-
-				showMessage("Raport pobrany pomyślnie", "success");
-			} catch (error) {
-				console.error(error);
-				showMessage("Nie udało się pobrać raportu AI", "error");
-			}
-		}
-
-    function archiveOrder(event, orderId) {
-        if(event) event.stopPropagation();
-		const archiveModal = document.getElementById('archiveConfirmModal');
-		const confirmBtn = document.getElementById('confirmArchiveBtn');
-
-		archiveModal.style.display = 'flex';
-		archiveModal.style.alignItems = 'center';
-		archiveModal.style.justifyContent = 'center';
-
-		confirmBtn.onclick = async function() {
-			archiveModal.style.display = 'none';
-			try {
-				const res = await fetch(`/orders/${orderId}/status?status=ARCHIVED`, { method: "PUT" });
-				if (!res.ok) { const data = await res.json(); throw new Error(WeldERP.errorMessage(data.detail)); }
-				showMessage("Zlecenie zarchiwizowano", "success");
-				closeModal();
-				await loadOrders();
-			} catch {
-				showMessage("Wystąpił błąd", "error");
-			}
-		};
+        return card;
     }
 
-	async function approveOrder(event, orderId) {
-		event.stopPropagation();
-		try {
-			const res = await fetch(`/orders/${orderId}/approve`, { method: "PUT" });
-			if (res.ok) {
-				showMessage("Zlecenie zatwierdzone!", "success");
-				loadOrders();
-			} else {
-				showMessage("Błąd zatwierdzania", "error");
-			}
-		} catch(e) {
-			showMessage("Błąd połączenia", "error");
-		}
-	}
+    function matchesSearch(order) {
+        if (!searchQuery) {
+            return true;
+        }
 
-	async function markNeedsCorrection(orderId, event = null) {
-		if (event) event.stopPropagation();
-		if (!orderId) return;
+        const searchableText = [
+            order.order_number,
+            order.client_name,
+            order.project_name || ""
+        ]
+            .join(" ")
+            .toLowerCase();
 
-		try {
-			const res = await fetch(`/orders/${orderId}/needs-correction`, { method: "PUT" });
-			if (!res.ok) { const data = await res.json(); throw new Error(WeldERP.errorMessage(data.detail)); }
+        return searchableText.includes(searchQuery);
+    }
 
-			showMessage("Zlecenie wróciło do oczekujących", "success");
-			closeModal();
-			await loadOrders();
-		} catch (e) {
-			showMessage("Nie udało się oznaczyć do poprawy", "error");
-		}
-	}
+    function renderBoard() {
+        const visibleOrders = orders
+            .filter(o => o.status !== "ARCHIVED")
+            .filter(matchesSearch);
+        const hasSearch = Boolean(searchQuery);
 
-	async function deleteOrder(orderId) {
-		if (!orderId) return;
-		if (!confirm("Czy na pewno chcesz usunąć to zlecenie?")) return;
+        STATUSES.forEach((status) => {
+            const container = document.getElementById(COLUMN_IDS[status]);
+            const count = document.getElementById(`count-${status}`);
+            const items = visibleOrders.filter((o) => o.status === status);
 
-		try {
-			const res = await fetch(`/orders/${orderId}`, { method: "DELETE" });
-			if (!res.ok) { const data = await res.json(); throw new Error(WeldERP.errorMessage(data.detail)); }
+            container.innerHTML = "";
+            count.textContent = String(items.length);
 
-			showMessage("Zlecenie usunięte", "success");
-			closeModal();
-			await loadOrders();
-		} catch (e) {
-			showMessage(e.message || "Nie udało się usunąć zlecenia", "error");
-		}
-	}
+            if (!items.length) {
+                const empty = document.createElement("p");
+                empty.className = "empty-state";
+                empty.textContent = hasSearch ? "Brak wyników" : "Brak zleceń";
+                container.appendChild(empty);
+                return;
+            }
 
-	async function togglePartMaterialMissing(partId, missing) {
-		try {
-			const res = await fetch(`/parts/${partId}/material-missing?missing=${missing}`, { method: "PUT" });
-			if (!res.ok) { const data = await res.json(); throw new Error(WeldERP.errorMessage(data.detail)); }
+            items.forEach((order) => {
+                container.appendChild(createCard(order));
+            });
+        });
+    }
 
-			showMessage(missing ? "Oznaczono brak materiału" : "Materiał uzupełniony", "success");
-			await loadOrders();
-			if (currentOpenOrderId) {
-				openModal(currentOpenOrderId);
-			}
-		} catch (e) {
-			showMessage("Nie udało się zmienić statusu materiału", "error");
-		}
-	}
+    async function loadOrders() {
+        const res = await fetch("/orders/");
+        if (!res.ok) {
+            showMessage("Błąd pobierania zleceń", "error");
+            return;
+        }
 
-		async function saveStepCompletion(stepId, checkbox) {
-			const orderId = currentOpenOrderId;
-			const order = orders.find(order => order.id === orderId);
-			checkbox.disabled = true;
-			const completed = checkbox.checked;
-			try {
-				const result = await WeldERP.request(`/steps/${stepId}/completion`, WeldERP.json('PUT', {is_completed: completed}));
-				await loadOrders();
-				if (currentOpenOrderId === orderId) openModal(orderId);
-				const message = order?.status === 'QUALITY_CHECK' && result.order_status !== order.status
-					? 'Cofnięto wykonanie. Wycofano zatwierdzenie jakości i cofnięto zlecenie do ' + (result.order_status === 'IN_QUEUE' ? 'kolejki.' : 'realizacji.')
-					: completed ? 'Oznaczono operację jako wykonaną' : 'Cofnięto oznaczenie wykonania operacji';
-				showMessage(message, 'success');
-			} catch (err) {
-				checkbox.checked = !completed;
-				checkbox.disabled = false;
-				showMessage(err.message || 'Nie udało się zmienić wykonania operacji', 'error');
-			}
-		}
+        orders = await res.json();
+        renderBoard();
+    }
+
+    async function moveOrder(orderId, targetStatus) {
+        const current = orders.find((o) => o.id === orderId);
+        if (!current || current.status === targetStatus) {
+            return;
+        }
+
+        if (current.status === 'COMPLETED') {
+            showMessage("Zakończonych zleceń nie można przenosić!", "error");
+            return;
+        }
+
+        if (targetStatus === 'QUALITY_CHECK' && current.status !== 'IN_PROGRESS') {
+            showMessage("Do kontroli jakości można przekazać tylko zlecenie w realizacji.", "error");
+            return;
+        }
+
+        if (targetStatus === 'COMPLETED' && !current.is_approved) {
+            showMessage("Wymagane jest zatwierdzenie jakości przed zakończeniem!", "error");
+            return;
+        }
+
+        const res = await fetch(`/orders/${orderId}/status?status=${targetStatus}`, {
+            method: "PUT"
+        });
+
+        if (!res.ok) {
+            const problem = await res.json().catch(() => ({}));
+            await loadOrders();
+            showMessage(WeldERP.errorMessage(problem.detail || 'Nie udało się zmienić statusu'), "error");
+            return;
+        }
+
+        await loadOrders();
+        showMessage("Status zaktualizowany", "success");
+    }
+
+    function setupDropZones() {
+        document.querySelectorAll(".cards").forEach((zone) => {
+            zone.addEventListener("dragover", (event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                zone.classList.add("drop-active");
+            });
+
+            zone.addEventListener("dragleave", () => {
+                zone.classList.remove("drop-active");
+            });
+
+            zone.addEventListener("drop", async (event) => {
+                event.preventDefault();
+                zone.classList.remove("drop-active");
+
+                const droppedId = Number(event.dataTransfer.getData("text/plain"));
+                const targetStatus = zone.dataset.status;
+                if (!droppedId || !targetStatus) {
+                    return;
+                }
+
+                await moveOrder(droppedId, targetStatus);
+            });
+        });
+    }
+
+    document.getElementById("refreshBtn").addEventListener("click", () => {
+        loadOrders();
+    });
+
+    document.getElementById("newOrderBtn").addEventListener("click", () => {
+        window.location.href = "/index.html";
+    });
+
+    document.getElementById("searchInput").addEventListener("input", (event) => {
+        searchQuery = event.target.value.trim().toLowerCase();
+        renderBoard();
+    });
+
+    setupDropZones();
+    loadOrders();
+
+    // Automatyczne odświeżanie Kanbanu co 30 sekund
+    setInterval(() => {
+        if (!document.hidden) {
+            loadOrders();
+        }
+    }, 30000);
+
+    async function downloadAIReport() {
+        showMessage("AI generuje raport PDF...", "info");
+
+        try {
+            const response = await fetch("/reports/ai-pdf"); // Endpoint w main.py
+
+            if (!response.ok) throw new Error("Błąd generowania raportu");
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+
+            a.href = url;
+            a.download = `Raport_Produkcyjny_AI_${new Date().toISOString().slice(0, 10)}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+
+            showMessage("Raport pobrany pomyślnie", "success");
+        } catch (error) {
+            console.error(error);
+            showMessage("Nie udało się pobrać raportu AI", "error");
+        }
+    }
+
+    function archiveOrder(event, orderId) {
+        if (event) event.stopPropagation();
+        const archiveModal = document.getElementById('archiveConfirmModal');
+        const confirmBtn = document.getElementById('confirmArchiveBtn');
+
+        archiveModal.style.display = 'flex';
+        archiveModal.style.alignItems = 'center';
+        archiveModal.style.justifyContent = 'center';
+
+        confirmBtn.onclick = async function () {
+            archiveModal.style.display = 'none';
+            try {
+                const res = await fetch(`/orders/${orderId}/status?status=ARCHIVED`, {method: "PUT"});
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(WeldERP.errorMessage(data.detail));
+                }
+                showMessage("Zlecenie zarchiwizowano", "success");
+                closeModal();
+                await loadOrders();
+            } catch {
+                showMessage("Wystąpił błąd", "error");
+            }
+        };
+    }
+
+    async function approveOrder(event, orderId) {
+        event.stopPropagation();
+        try {
+            const res = await fetch(`/orders/${orderId}/approve`, {method: "PUT"});
+            if (res.ok) {
+                showMessage("Zlecenie zatwierdzone!", "success");
+                await loadOrders();
+            } else {
+                const problem = await res.json().catch(() => ({}));
+                showMessage(WeldERP.errorMessage(problem.detail || "Błąd zatwierdzania"), "error");
+            }
+        } catch (e) {
+            showMessage("Błąd połączenia", "error");
+        }
+    }
+
+    async function markNeedsCorrection(orderId, event = null) {
+        if (event) event.stopPropagation();
+        if (!orderId) return;
+
+        try {
+            const res = await fetch(`/orders/${orderId}/needs-correction`, {method: "PUT"});
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(WeldERP.errorMessage(data.detail));
+            }
+
+            showMessage("Zlecenie wróciło do oczekujących", "success");
+            closeModal();
+            await loadOrders();
+        } catch (e) {
+            showMessage("Nie udało się oznaczyć do poprawy", "error");
+        }
+    }
+
+    async function deleteOrder(orderId) {
+        if (!orderId) return;
+        if (!confirm("Czy na pewno chcesz usunąć to zlecenie?")) return;
+
+        try {
+            const res = await fetch(`/orders/${orderId}`, {method: "DELETE"});
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(WeldERP.errorMessage(data.detail));
+            }
+
+            showMessage("Zlecenie usunięte", "success");
+            closeModal();
+            await loadOrders();
+        } catch (e) {
+            showMessage(e.message || "Nie udało się usunąć zlecenia", "error");
+        }
+    }
+
+    async function togglePartMaterialMissing(partId, missing) {
+        try {
+            const res = await fetch(`/parts/${partId}/material-missing?missing=${missing}`, {method: "PUT"});
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(WeldERP.errorMessage(data.detail));
+            }
+
+            showMessage(missing ? "Oznaczono brak materiału" : "Materiał uzupełniony", "success");
+            await loadOrders();
+            if (currentOpenOrderId) {
+                openModal(currentOpenOrderId);
+            }
+        } catch (e) {
+            showMessage("Nie udało się zmienić statusu materiału", "error");
+        }
+    }
+
+    async function saveStepCompletion(stepId, checkbox) {
+        const orderId = currentOpenOrderId;
+        const order = orders.find(order => order.id === orderId);
+        checkbox.disabled = true;
+        const completed = checkbox.checked;
+        try {
+            const result = await WeldERP.request(`/steps/${stepId}/completion`, WeldERP.json('PUT', {is_completed: completed}));
+            await loadOrders();
+            if (currentOpenOrderId === orderId) openModal(orderId);
+            const message = order?.status === 'QUALITY_CHECK' && result.order_status !== order.status
+                ? 'Cofnięto wykonanie. Wycofano zatwierdzenie jakości i cofnięto zlecenie do ' + (result.order_status === 'IN_QUEUE' ? 'kolejki.' : 'realizacji.')
+                : completed ? 'Oznaczono operację jako wykonaną' : 'Cofnięto oznaczenie wykonania operacji';
+            showMessage(message, 'success');
+        } catch (err) {
+            checkbox.checked = !completed;
+            checkbox.disabled = false;
+            showMessage(err.message || 'Nie udało się zmienić wykonania operacji', 'error');
+        }
+    }
 
     async function savePartMaterialUsage(partId, partBox) {
         if (!partBox) return;
@@ -949,14 +1085,19 @@
         if (button.disabled) return;
         const quantity = partBox.querySelector('.part-material-quantity').value.trim();
         const unit = partBox.querySelector('.part-material-unit').value.trim();
+        if (!quantity) {
+            showMessage('Wpisz łączną zużytą ilość. Aby wycofać zużycie, wpisz 0.', 'error');
+            return;
+        }
         button.disabled = true;
         try {
             await WeldERP.request(`/parts/${partId}/material-usage`, WeldERP.json('PUT', {
-                material_quantity: quantity || null, material_unit: unit || null
+                material_quantity: quantity, material_unit: unit || null,
+                expected_version: Number(partBox.dataset.usageVersion)
             }));
             await loadOrders();
             if (currentOpenOrderId) openModal(currentOpenOrderId);
-            showMessage('Zużycie materiału zapisane', 'success');
+            showMessage('Zapisano zużycie i rozliczono magazyn', 'success');
         } catch (error) {
             showMessage(error.message || 'Nie udało się zapisać zużycia materiału', 'error');
         } finally {
@@ -964,7 +1105,7 @@
         }
     }
 
-	async function deletePdf(pdfId, element) {
+    async function deletePdf(pdfId, element) {
         const block = element.closest('.edit-part-item');
         block.removedPdfIds.add(pdfId);
         element.parentElement.remove();
@@ -1002,77 +1143,78 @@
     }
 
 
-	async function openOperatorModal() {
-		document.getElementById('operatorModal').style.display = 'block';
-		const res = await fetch('/operators/');
-		const ops = await res.json();
-		const list = document.getElementById('opList');
+    async function openOperatorModal() {
+        document.getElementById('operatorModal').style.display = 'block';
+        const res = await fetch('/operators/');
+        const ops = await res.json();
+        const list = document.getElementById('opList');
 
-		list.innerHTML = ops.map(op => `
+        list.innerHTML = ops.map(op => `
 			<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #f3f4f6;">
 				<span style="font-weight: 500; color: #374151;">${op.name}</span>
 				<button onclick="deleteOperator(${op.id})" style="background: #fee2e2; color: #ef4444; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px;">Usuń</button>
 			</div>
 		`).join('');
-	}
+    }
 
-	async function addOperator() {
-		const inputElement = document.getElementById('newOpName');
-		const name = inputElement.value;
+    async function addOperator() {
+        const inputElement = document.getElementById('newOpName');
+        const name = inputElement.value;
 
-		if (!name.trim()) return;
+        if (!name.trim()) return;
 
-		await fetch(`/operators/?name=${encodeURIComponent(name)}`, { method: 'POST' });
+        await fetch(`/operators/?name=${encodeURIComponent(name)}`, {method: 'POST'});
 
-		inputElement.value = "";
-		openOperatorModal();
-		refreshOperatorDropdowns();
-	}
+        inputElement.value = "";
+        openOperatorModal();
+        refreshOperatorDropdowns();
+    }
 
-	async function deleteOperator(opId) {
-		if (!confirm("Czy na pewno chcesz usunąć tego operatora?")) return;
+    async function deleteOperator(opId) {
+        if (!confirm("Czy na pewno chcesz usunąć tego operatora?")) return;
 
-		try {
-			const res = await fetch(`/operators/${opId}`, { method: 'DELETE' });
+        try {
+            const res = await fetch(`/operators/${opId}`, {method: 'DELETE'});
 
-			if (res.status === 400) {
-				const data = await res.json();
-				alert(data.detail); // Wyświetli: "Nie można usunąć operatora."
-			} else if (res.ok) {
-				openOperatorModal();
-				refreshOperatorDropdowns();
-			} else {
-				alert("Wystąpił nieoczekiwany błąd.");
-			}
-		} catch (err) {
-			console.error(err);
-			alert("Błąd połączenia z serwerem.");
-		}
-	}
+            if (res.status === 400) {
+                const data = await res.json();
+                alert(data.detail); // Wyświetli: "Nie można usunąć operatora."
+            } else if (res.ok) {
+                openOperatorModal();
+                refreshOperatorDropdowns();
+            } else {
+                alert("Wystąpił nieoczekiwany błąd.");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Błąd połączenia z serwerem.");
+        }
+    }
 
-	async function refreshOperatorDropdowns() {
-		try {
-			const res = await fetch('/operators/');
-			availableOperators = await res.json();
+    async function refreshOperatorDropdowns() {
+        try {
+            const res = await fetch('/operators/');
+            availableOperators = await res.json();
 
-			const operatorSelects = document.querySelectorAll('select.part-operator, select.step-operator, select#editOperator, select.edit-part-operator, select.edit-step-operator');
+            const operatorSelects = document.querySelectorAll('select.part-operator, select.step-operator, select#editOperator, select.edit-part-operator, select.edit-step-operator');
 
-			operatorSelects.forEach(select => {
-				const currentVal = select.value;
-				const defaultOption = select.querySelector('option[value=""]') ? `<option value="">${select.querySelector('option[value=""]').text}</option>` : '';
+            operatorSelects.forEach(select => {
+                const currentVal = select.value;
+                const defaultOption = select.querySelector('option[value=""]') ? `<option value="">${select.querySelector('option[value=""]').text}</option>` : '';
 
-				select.innerHTML = defaultOption + operatorOptionsHtml();
+                select.innerHTML = defaultOption + operatorOptionsHtml();
 
-				select.value = currentVal;
-			});
-		} catch (err) {
-			console.error("Błąd przy odświeżaniu listy operatorów:", err);
-		}
-	}
-	async function logout() {
-		await fetch('/logout/', { method: 'POST' });
-		window.location.href = "/frontend/login.html";
-	}
-	</script>
+                select.value = currentVal;
+            });
+        } catch (err) {
+            console.error("Błąd przy odświeżaniu listy operatorów:", err);
+        }
+    }
+
+    async function logout() {
+        await fetch('/logout/', {method: 'POST'});
+        window.location.href = "/frontend/login.html";
+    }
+</script>
 </body>
 </html>

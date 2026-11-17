@@ -35,11 +35,62 @@
                     onclick="window.location.href='/frontend/alerts.html'">
                 Alerty
             </button>
+            <button class="btn" data-manager-only hidden onclick="window.location.href='/frontend/warehouse.html'">
+                Magazyn
+            </button>
         </div>
 
     </div>
 
     <!-- FILTRY AI -->
+
+    <!--    <div style="-->
+    <!--    background: white;-->
+    <!--    padding: 20px;-->
+    <!--    border-radius: 12px;-->
+    <!--    border: 1px solid #e5e7eb;-->
+    <!--    margin-bottom: 25px;-->
+    <!--    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);-->
+    <!--    display: flex;-->
+    <!--    gap: 20px;-->
+    <!--    align-items: flex-end;-->
+    <!--    flex-wrap: wrap;-->
+    <!--">-->
+
+    <!--    <div style="flex: 1; min-width: 150px;">-->
+    <!--        <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #4b5563; text-transform: uppercase;">-->
+    <!--            Data od-->
+    <!--        </label>-->
+    <!--        <input type="date" id="dateFrom" class="search" style="width: 100%; box-sizing: border-box; background-color: #f9fafb;">-->
+    <!--    </div>-->
+
+    <!--    <div style="flex: 1; min-width: 150px;">-->
+    <!--        <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #4b5563; text-transform: uppercase;">-->
+    <!--            Data do-->
+    <!--        </label>-->
+    <!--        <input type="date" id="dateTo" class="search" style="width: 100%; box-sizing: border-box; background-color: #f9fafb;">-->
+    <!--    </div>-->
+
+    <!--    <button-->
+    <!--        class="btn"-->
+    <!--        onclick="generateArchiveAIReport(event)"-->
+    <!--        style="-->
+    <!--            border: 2px solid #8b5cf6;-->
+    <!--            color: white;-->
+    <!--            background: #8b5cf6;-->
+    <!--            font-weight: bold;-->
+    <!--            padding: 10px 20px;-->
+    <!--            border-radius: 8px;-->
+    <!--            transition: all 0.2s ease;-->
+    <!--        "-->
+    <!--        onmouseover="this.style.background='#7c3aed'; this.style.borderColor='#7c3aed';"-->
+    <!--        onmouseout="this.style.background='#8b5cf6'; this.style.borderColor='#8b5cf6';"-->
+    <!--    >-->
+    <!--        ✨ Generuj raport AI-->
+    <!--    </button>-->
+    <!--    </div>-->
+
+    <!-- FILTRY LISTY ARCHIWUM -->
 
     <div style="
     background: white;
@@ -47,44 +98,86 @@
     border-radius: 12px;
     border: 1px solid #e5e7eb;
     margin-bottom: 25px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    display: flex;
-    gap: 20px;
-    align-items: flex-end;
-    flex-wrap: wrap;
 ">
 
-    <div style="flex: 1; min-width: 150px;">
-        <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #4b5563; text-transform: uppercase;">
-            Data od
-        </label>
-        <input type="date" id="dateFrom" class="search" style="width: 100%; box-sizing: border-box; background-color: #f9fafb;">
+        <h3 style="margin-top: 0;">
+            Filtruj zlecenia w archiwum
+        </h3>
+
+        <div style="
+        display: flex;
+        gap: 15px;
+        align-items: flex-end;
+        flex-wrap: wrap;
+    ">
+
+            <div style="flex: 2; min-width: 200px;">
+                <label for="archiveClient">Klient / nazwisko</label>
+                <input
+                        type="text"
+                        id="archiveClient"
+                        class="search"
+                        placeholder="Wpisz nazwę klienta..."
+                        style="width: 100%; box-sizing: border-box;"
+                >
+            </div>
+
+            <div style="flex: 1; min-width: 150px;">
+                <label for="archiveDateFrom">Data przyjęcia od</label>
+                <input
+                        type="date"
+                        id="archiveDateFrom"
+                        class="search"
+                        style="width: 100%; box-sizing: border-box;"
+                >
+            </div>
+
+            <div style="flex: 1; min-width: 150px;">
+                <label for="archiveDateTo">Data przyjęcia do</label>
+                <input
+                        type="date"
+                        id="archiveDateTo"
+                        class="search"
+                        style="width: 100%; box-sizing: border-box;"
+                >
+            </div>
+
+            <button class="btn" onclick="clearArchiveFilters()">
+                Wyczyść filtry
+            </button>
+
+            <button class="btn"
+                    onclick="generateArchiveAIReport(event)"
+                    style="background: #8b5cf6; color: white;">
+                ✨ Generuj raport AI
+            </button>
+
+        </div>
+
+        <p id="archiveCounter"
+           style="margin-bottom: 0; color: #6b7280; font-size: 13px;">
+        </p>
+
     </div>
 
-    <div style="flex: 1; min-width: 150px;">
-        <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 8px; color: #4b5563; text-transform: uppercase;">
-            Data do
-        </label>
-        <input type="date" id="dateTo" class="search" style="width: 100%; box-sizing: border-box; background-color: #f9fafb;">
-    </div>
+    <div id="archiveReportPreview"
+         style="display: none; background: white; padding: 20px;
+            border: 1px solid #e5e7eb; border-radius: 12px;
+            margin-bottom: 25px;">
 
-    <button
-        class="btn"
-        onclick="generateArchiveAIReport(event)"
-        style="
-            border: 2px solid #8b5cf6;
-            color: white;
-            background: #8b5cf6;
-            font-weight: bold;
-            padding: 10px 20px;
-            border-radius: 8px;
-            transition: all 0.2s ease;
-        "
-        onmouseover="this.style.background='#7c3aed'; this.style.borderColor='#7c3aed';"
-        onmouseout="this.style.background='#8b5cf6'; this.style.borderColor='#8b5cf6';"
-    >
-        ✨ Generuj raport AI
-    </button>
+        <h3>Raport AI dla przefiltrowanych zleceń</h3>
+
+        <iframe id="archiveReportFrame"
+                title="Podgląd raportu AI"
+                style="width: 100%; height: 650px; border: 1px solid #e5e7eb;">
+        </iframe>
+
+        <a id="archiveReportDownload"
+           class="btn"
+           download="Raport_Archiwum_AI.pdf"
+           style="display: inline-block; margin-top: 15px;">
+            Pobierz PDF
+        </a>
     </div>
 
     <div id="archiveContainer"
@@ -113,67 +206,158 @@
 
 </div>
 
-<script src="/frontend/js/api.js"></script>
+<script src="/frontend/js/api.js?v=manager-planning-1"></script>
 <script>
 
-function escapeHtml(value) {
-    return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
 
-function formatDateTime(value) {
-    if (!value) return "Nie wykonano";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "Nie wykonano";
-    return date.toLocaleString("pl-PL", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit"
-    });
-}
+    function formatDateTime(value) {
+        if (!value) return "Nie wykonano";
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return "Nie wykonano";
+        return date.toLocaleString("pl-PL", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit"
+        });
+    }
 
-async function loadArchive() {
+    function statusLabel(status) {
+        const labels = {
+            IN_QUEUE: "Oczekujące",
+            IN_PROGRESS: "W realizacji",
+            QUALITY_CHECK: "Kontrola jakości",
+            COMPLETED: "Zakończone",
+            ARCHIVED: "Archiwum"
+        };
 
-    const res = await fetch("/orders/");
+        return labels[status] || status || "Utworzenie";
+    }
 
-    const orders = await res.json();
+    let archiveOrders = [];
 
-    const archived = orders.filter(
-        o => o.status === "ARCHIVED"
-    );
+    document.getElementById("archiveClient")
+        .addEventListener("input", renderArchive);
 
-    const container =
-        document.getElementById(
-            "archiveContainer"
-        );
+    document.getElementById("archiveDateFrom")
+        .addEventListener("change", renderArchive);
 
-    container.innerHTML = "";
+    document.getElementById("archiveDateTo")
+        .addEventListener("change", renderArchive);
 
-    archived.forEach(order => {
+    async function loadArchive() {
 
-        const div =
-            document.createElement("div");
+        const container = document.getElementById("archiveContainer");
 
-        div.className = "order-card";
+        try {
+            const res = await fetch("/orders/");
 
-        div.innerHTML = `
+            if (!res.ok) {
+                throw new Error("Nie udało się pobrać archiwum");
+            }
+
+            const orders = await res.json();
+
+            archiveOrders = orders.filter(
+                order => order.status === "ARCHIVED"
+            );
+
+            renderArchive();
+
+        } catch (error) {
+            console.error(error);
+
+            container.textContent =
+                "Nie udało się pobrać zleceń z archiwum.";
+        }
+    }
+
+
+    // WYŚWIETLANIE I FILTROWANIE ARCHIWUM
+
+    function renderArchive() {
+
+        const query = document
+            .getElementById("archiveClient")
+            .value
+            .trim()
+            .toLocaleLowerCase("pl");
+
+        const dateFrom = document
+            .getElementById("archiveDateFrom")
+            .value;
+
+        const dateTo = document
+            .getElementById("archiveDateTo")
+            .value;
+
+        const filteredOrders = archiveOrders.filter(order => {
+
+            const clientName = (order.client_name || "")
+                .toLocaleLowerCase("pl");
+
+            const receivedDate = order.date_received
+                ? order.date_received.slice(0, 10)
+                : "";
+
+            const matchesClient =
+                !query || clientName.includes(query);
+
+            const matchesFrom =
+                !dateFrom || (receivedDate && receivedDate >= dateFrom);
+
+            const matchesTo =
+                !dateTo || (receivedDate && receivedDate <= dateTo);
+
+            return matchesClient && matchesFrom && matchesTo;
+        });
+
+        const container = document.getElementById("archiveContainer");
+
+        const counter = document.getElementById("archiveCounter");
+
+        container.innerHTML = "";
+
+        counter.textContent =
+            `Wyświetlono ${filteredOrders.length} z ${archiveOrders.length} zleceń`;
+
+        if (filteredOrders.length === 0) {
+
+            const message = document.createElement("p");
+
+            message.textContent =
+                "Brak zleceń spełniających wybrane kryteria.";
+
+            container.appendChild(message);
+
+            return;
+        }
+
+        filteredOrders.forEach(order => {
+
+            const div = document.createElement("div");
+
+            div.className = "order-card";
+
+            div.innerHTML = `
 
             <div class="card-header">
 
                 <div>
 
                     <p class="order-number">
-
                         <strong>
                             ${escapeHtml(order.order_number)}
                         </strong>
-
                     </p>
 
                     <p class="client">
@@ -183,8 +367,7 @@ async function loadArchive() {
                 </div>
 
                 <button class="btn"
-                        onclick="openArchiveModal(${order.id})">
-
+                        onclick="openArchiveModal(${Number(order.id)})">
                     Szczegóły
                 </button>
 
@@ -200,58 +383,63 @@ async function loadArchive() {
             ">
 
                 <span>
-
                     📥 Data złożenia:
-
                     ${
-                        order.date_received
-                        ? order.date_received.slice(0,10)
-                        : "Brak"
-                    }
-
+                order.date_received
+                    ? escapeHtml(order.date_received.slice(0, 10))
+                    : "Brak"
+            }
                 </span>
 
                 <span>
-
                     📅 Termin:
-
                     ${
-                        order.date_deadline
-                        ? order.date_deadline.slice(0,10)
-                        : "Brak"
-                    }
-
+                order.date_deadline
+                    ? escapeHtml(order.date_deadline.slice(0, 10))
+                    : "Brak"
+            }
                 </span>
 
                 <span>
-
                     👤 Operator:
-
-                    ${order.operator || "Brak"}
-
+                    ${escapeHtml(order.operator || "Brak")}
                 </span>
 
             </div>
         `;
 
-        container.appendChild(div);
-    });
-}
-
-loadArchive();
+            container.appendChild(div);
+        });
+    }
 
 
-// MODAL
+    // CZYSZCZENIE FILTRÓW
 
-function openArchiveModal(orderId) {
+    function clearArchiveFilters() {
 
-    fetch(`/orders/${orderId}`)
+        document.getElementById("archiveClient").value = "";
 
-        .then(res => res.json())
+        document.getElementById("archiveDateFrom").value = "";
 
-        .then(order => {
+        document.getElementById("archiveDateTo").value = "";
 
-            let html = `
+        renderArchive();
+    }
+
+    loadArchive();
+
+
+    // MODAL
+
+    function openArchiveModal(orderId) {
+
+        fetch(`/orders/${orderId}`)
+
+            .then(res => res.json())
+
+            .then(order => {
+
+                let html = `
 
                 <div style="
                     display: flex;
@@ -288,7 +476,7 @@ function openArchiveModal(orderId) {
                                 Operator:
                             </strong>
 
-                            ${order.operator || "Brak"}
+                            ${escapeHtml(order.operator || "Brak")}
 
                         </p>
 
@@ -299,10 +487,10 @@ function openArchiveModal(orderId) {
                             </strong>
 
                             ${
-                                order.date_received
-                                ? order.date_received.slice(0,10)
-                                : "Brak"
-                            }
+                    order.date_received
+                        ? order.date_received.slice(0, 10)
+                        : "Brak"
+                }
 
                         </p>
 
@@ -313,10 +501,10 @@ function openArchiveModal(orderId) {
                             </strong>
 
                             ${
-                                order.date_deadline
-                                ? order.date_deadline.slice(0,10)
-                                : "Brak"
-                            }
+                    order.date_deadline
+                        ? order.date_deadline.slice(0, 10)
+                        : "Brak"
+                }
 
                         </p>
 
@@ -365,13 +553,13 @@ function openArchiveModal(orderId) {
                 </h3>
             `;
 
-            order.parts.forEach(part => {
-                const partMaterialUsage =
-                    part.material_quantity !== null && part.material_quantity !== undefined
-                    ? `${escapeHtml(part.material_quantity)} ${escapeHtml(part.material_unit || "")}`
-                    : "Brak";
+                order.parts.forEach(part => {
+                    const partMaterialUsage =
+                        part.material_quantity !== null && part.material_quantity !== undefined
+                            ? `${escapeHtml(part.material_quantity)} ${escapeHtml(part.material_unit || "")}`
+                            : "Brak";
 
-                html += `
+                    html += `
 
                     <div style="
                         margin-bottom: 20px;
@@ -426,10 +614,10 @@ function openArchiveModal(orderId) {
                         </div>
                 `;
 
-                html += (part.pdfs || []).map(pdf => `<a target="_blank" class="pdf-badge" href="${escapeHtml(pdf.url)}">${escapeHtml(pdf.file_name)}</a>`).join(' ');
-                if (part.steps.length > 0) {
+                    html += (part.pdfs || []).map(pdf => `<a target="_blank" class="pdf-badge" href="${escapeHtml(pdf.url)}">${escapeHtml(pdf.file_name)}</a>`).join(' ');
+                    if (part.steps.length > 0) {
 
-                    html += `
+                        html += `
 
                         <ul style="
                             margin-top: 10px;
@@ -437,9 +625,9 @@ function openArchiveModal(orderId) {
                         ">
                     `;
 
-                    part.steps.forEach(step => {
+                        part.steps.forEach(step => {
 
-                        html += `
+                            html += `
 
                             <li style="
                                 margin-bottom: 10px;
@@ -498,8 +686,8 @@ function openArchiveModal(orderId) {
                                     ">
 
                                     ${
-                                        step.pdf_path
-                                        ? `
+                                step.pdf_path
+                                    ? `
                                         <a href="/${step.pdf_path}"
                                            target="_blank"
                                            class="pdf-badge">
@@ -508,7 +696,7 @@ function openArchiveModal(orderId) {
 
                                         </a>
                                         `
-                                        : `
+                                    : `
                                         <span style="
                                             font-size: 12px;
                                             color: #9ca3af;
@@ -518,7 +706,7 @@ function openArchiveModal(orderId) {
 
                                         </span>
                                         `
-                                    }
+                            }
 
                                     </div>
 
@@ -526,234 +714,264 @@ function openArchiveModal(orderId) {
 
                             </li>
                         `;
+                        });
+
+                        html += `</ul>`;
+                    }
+
+
+                    html += `</div>`;
+                });
+                // HISTORIA ZMIAN STATUSÓW
+
+                html += `
+    <hr style="margin: 25px 0;">
+
+    <h3>Historia zmian statusów</h3>
+`;
+
+                const events = order.status_events || [];
+
+                if (events.length === 0) {
+
+                    html += `
+        <p style="color: #6b7280;">
+            Brak zapisanej historii zmian statusów.
+        </p>
+    `;
+
+                } else {
+
+                    html += `
+        <div style="display: grid; gap: 10px;">
+    `;
+
+                    events.forEach(event => {
+
+                        html += `
+            <div style="
+                padding: 12px;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                background: #f9fafb;
+            ">
+
+                <strong>
+                    ${
+                            event.from_status
+                                ? `${escapeHtml(statusLabel(event.from_status))} → ${escapeHtml(statusLabel(event.to_status))}`
+                                : `Utworzenie zlecenia → ${escapeHtml(statusLabel(event.to_status))}`
+                        }
+                </strong>
+
+                <p style="margin: 6px 0; font-size: 13px;">
+                    ${escapeHtml(formatDateTime(event.occurred_at))}
+                </p>
+
+                <p style="margin: 0; color: #6b7280;">
+                    ${escapeHtml(event.reason)}
+                </p>
+
+            </div>
+        `;
                     });
 
-                    html += `</ul>`;
+                    html += `</div>`;
                 }
 
-                html += `</div>`;
+                document.getElementById(
+                    "archiveModalContent"
+                ).innerHTML = html;
+
+                document.getElementById(
+                    "archiveModal"
+                ).style.display = "flex";
             });
+    }
 
-            document.getElementById(
-                "archiveModalContent"
-            ).innerHTML = html;
+    function closeArchiveModal() {
 
-            document.getElementById(
-                "archiveModal"
-            ).style.display = "flex";
-        });
-}
-
-function closeArchiveModal() {
-
-    document.getElementById(
-        "archiveModal"
-    ).style.display = "none";
-}
-
-
-// ZAMYKANIE MODALA
-
-window.onclick = function(event) {
-
-    const modal =
         document.getElementById(
             "archiveModal"
-        );
-
-    if (event.target === modal) {
-
-        modal.style.display = "none";
+        ).style.display = "none";
     }
-}
 
 
-// RAPORT AI DLA JEDNEGO ZLECENIA
+    // ZAMYKANIE MODALA
 
-async function downloadAIReport(orderId) {
+    window.onclick = function (event) {
 
-    const loadingBtn = document.querySelector(
-        `[data-order-id="${orderId}"]`
-    );
-
-    const originalText =
-        loadingBtn.innerHTML;
-
-    try {
-
-        loadingBtn.innerHTML =
-            "Generowanie raportu...";
-
-        loadingBtn.disabled = true;
-
-        const response =
-            await fetch(
-                `/orders/${orderId}/ai-summary`
+        const modal =
+            document.getElementById(
+                "archiveModal"
             );
 
-        if (!response.ok) {
+        if (event.target === modal) {
 
-            throw new Error();
+            modal.style.display = "none";
         }
+    }
 
-        const blob =
-            await response.blob();
 
-        const url =
-            window.URL.createObjectURL(blob);
+    // RAPORT AI DLA JEDNEGO ZLECENIA
 
-        const a =
-            document.createElement("a");
+    async function downloadAIReport(orderId) {
 
-        a.href = url;
+        const loadingBtn = document.querySelector(
+            `[data-order-id="${orderId}"]`
+        );
 
-        a.download =
-            `Raport_AI_${orderId}.pdf`;
+        const originalText =
+            loadingBtn.innerHTML;
 
-        document.body.appendChild(a);
-
-        a.click();
-
-        window.URL.revokeObjectURL(url);
-
-        loadingBtn.innerHTML =
-            "Pobrano raport";
-
-        setTimeout(() => {
+        try {
 
             loadingBtn.innerHTML =
-                originalText;
+                "Generowanie raportu...";
 
-            loadingBtn.disabled = false;
+            loadingBtn.disabled = true;
 
-        }, 2000);
+            const response =
+                await fetch(
+                    `/orders/${orderId}/ai-summary`
+                );
 
-    } catch (error) {
+            if (!response.ok) {
 
-        console.error(error);
+                throw new Error();
+            }
 
-        loadingBtn.innerHTML =
-            "Błąd raportu";
+            const blob =
+                await response.blob();
 
-        setTimeout(() => {
+            const url =
+                window.URL.createObjectURL(blob);
+
+            const a =
+                document.createElement("a");
+
+            a.href = url;
+
+            a.download =
+                `Raport_AI_${orderId}.pdf`;
+
+            document.body.appendChild(a);
+
+            a.click();
+
+            window.URL.revokeObjectURL(url);
 
             loadingBtn.innerHTML =
-                originalText;
+                "Pobrano raport";
 
-            loadingBtn.disabled = false;
+            setTimeout(() => {
 
-        }, 2000);
+                loadingBtn.innerHTML =
+                    originalText;
 
-        alert(
-            "Nie udało się wygenerować raportu AI"
-        );
-    }
-}
+                loadingBtn.disabled = false;
 
+            }, 2000);
 
-// RAPORT AI DLA ARCHIWUM
+        } catch (error) {
 
-async function generateArchiveAIReport(event) {
+            console.error(error);
 
-    const button = event.target;
+            loadingBtn.innerHTML =
+                "Błąd raportu";
 
-    const originalText =
-        button.innerHTML;
+            setTimeout(() => {
 
-    button.innerHTML =
-        "Generowanie raportu...";
+                loadingBtn.innerHTML =
+                    originalText;
 
-    button.disabled = true;
+                loadingBtn.disabled = false;
 
-    const dateFrom =
-        document.getElementById(
-            "dateFrom"
-        ).value;
+            }, 2000);
 
-    const dateTo =
-        document.getElementById(
-            "dateTo"
-        ).value;
-
-    if (!dateFrom || !dateTo) {
-
-        alert(
-            "Wybierz zakres dat"
-        );
-
-        button.innerHTML =
-            originalText;
-
-        button.disabled = false;
-
-        return;
+            alert(
+                "Nie udało się wygenerować raportu AI"
+            );
+        }
     }
 
-    try {
 
-        const response = await fetch(
+    // RAPORT AI DLA ARCHIWUM
 
-            `/reports/archive-ai-pdf?date_from=${dateFrom}&date_to=${dateTo}`
-        );
+    let archiveReportUrl = null;
 
-        if (!response.ok) {
+    async function generateArchiveAIReport(event) {
+        const button = event.currentTarget;
+        const originalText = button.innerHTML;
 
-            throw new Error();
+        const client = document.getElementById("archiveClient").value.trim();
+        const dateFrom = document.getElementById("archiveDateFrom").value;
+        const dateTo = document.getElementById("archiveDateTo").value;
+
+        if (dateFrom && dateTo && dateFrom > dateTo) {
+            alert("Data od nie może być późniejsza niż data do.");
+            return;
         }
 
-        const blob =
-            await response.blob();
+        const params = new URLSearchParams();
 
-        const url =
-            window.URL.createObjectURL(blob);
+        if (client) params.set("client", client);
+        if (dateFrom) params.set("date_from", dateFrom);
+        if (dateTo) params.set("date_to", dateTo);
 
-        const a =
-            document.createElement("a");
+        const preview = document.getElementById("archiveReportPreview");
+        const frame = document.getElementById("archiveReportFrame");
+        const download = document.getElementById("archiveReportDownload");
 
-        a.href = url;
+        button.disabled = true;
+        button.textContent = "Generowanie raportu...";
 
-        a.download =
-            "Raport_Archiwum_AI.pdf";
+        try {
+            const response = await fetch(
+                `/reports/archive-ai-pdf?${params.toString()}`
+            );
 
-        document.body.appendChild(a);
+            if (!response.ok) {
+                throw new Error(`Błąd HTTP: ${response.status}`);
+            }
 
-        a.click();
+            const blob = await response.blob();
 
-        window.URL.revokeObjectURL(url);
+            if (!blob.type.includes("pdf")) {
+                throw new Error("Serwer nie zwrócił pliku PDF.");
+            }
 
-        button.innerHTML =
-            "Pobrano raport";
+            const newUrl = URL.createObjectURL(blob);
 
-        setTimeout(() => {
+            frame.src = newUrl;
+            download.href = newUrl;
+            preview.style.display = "block";
 
-            button.innerHTML =
-                originalText;
+            if (archiveReportUrl) {
+                URL.revokeObjectURL(archiveReportUrl);
+            }
 
+            archiveReportUrl = newUrl;
+
+            preview.scrollIntoView({
+                behavior: "smooth",
+                block: "start"
+            });
+
+        } catch (error) {
+            console.error(error);
+            alert("Nie udało się wygenerować raportu AI.");
+        } finally {
+            button.innerHTML = originalText;
             button.disabled = false;
-
-        }, 2000);
-
-    } catch (error) {
-
-        console.error(error);
-
-        button.innerHTML =
-            "Błąd raportu";
-
-        setTimeout(() => {
-
-            button.innerHTML =
-                originalText;
-
-            button.disabled = false;
-
-        }, 2000);
-
-        alert(
-            "Nie udało się wygenerować raportu AI"
-        );
+        }
     }
-}
+
+    window.addEventListener("beforeunload", () => {
+        if (archiveReportUrl) {
+            URL.revokeObjectURL(archiveReportUrl);
+        }
+    });
 
 </script>
 

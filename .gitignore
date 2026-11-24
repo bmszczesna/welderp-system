@@ -211,6 +211,9 @@ uploads/
 .pytest_tmp/
 .test-artifacts/
 backups/
+frontend-tests/node_modules/
+frontend-tests/test-results/
+frontend-tests/playwright-report/
 
 # Local configuration, personal notes, reports and working databases
 .idea/

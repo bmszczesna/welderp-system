@@ -204,6 +204,50 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload
 ```
 
+### Testy API i UI
+
+Testy API uruchomisz w katalogu projektu:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+Polecenie bezpośrednio używa Pythona z `.venv` — nie musisz wcześniej
+aktywować środowiska. Jeśli je aktywujesz, możesz zamiast tego wykonać
+`python -m pytest`.
+
+Wykonują żądania do FastAPI na odizolowanej, tymczasowej bazie SQLite. Obejmują
+logowanie i role, zlecenia i statusy produkcji, dokumenty PDF, magazyn,
+rezerwacje i prognozy oraz błędne żądania i walidację.
+
+Testy UI korzystają z Playwright i Chromium. Wymagają Node.js 20 lub nowszego
+(CI używa Node.js 22). Po instalacji zależności backendu (`requirements-dev.txt`)
+przygotuj narzędzia przeglądarkowe:
+
+```powershell
+cd frontend-tests
+npm ci
+npx playwright install chromium
+npm test
+```
+
+Scenariusze UI sprawdzają m.in. zatwierdzanie jakości i zwrot do poprawy,
+archiwizowanie oraz filtrowanie archiwum, walidację, dodawanie i usuwanie
+załączników PDF, a także planowanie, przyjmowanie i anulowanie dostaw.
+
+Jeśli aplikacja nie działa pod adresem `http://127.0.0.1:8000`, Playwright
+uruchomi ją lokalnie przy użyciu `.venv`; nie trzeba osobno aktywować venv ani
+uruchamiać serwera. Odpowiedzi API w testach UI są kontrolowane, więc testowe
+logowanie, materiały i zlecenia nie zapisują się w bazie. Aby obserwować
+przebieg w oknie Chromium lub otworzyć panel interaktywny, uruchom:
+
+```powershell
+npx playwright test --headed
+npx playwright test --ui
+```
+
+Inny działający serwer można wskazać przez zmienną `WELDERP_BASE_URL`.
+
 Bez `DATABASE_URL` aplikacja korzysta z lokalnego `test.db` w katalogu projektu.
 To odrębna baza od PostgreSQL w Dockerze. Testy mają własną bazę w pamięci
 i katalog `.test-artifacts/uploads`; nie korzystają z danych aplikacji.
